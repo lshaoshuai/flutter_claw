@@ -1,78 +1,88 @@
 import '../sandbox/js_runtime.dart';
+import '../models/task_config.dart';
+import '../utils/logger.dart';
 
-/// 桥接插件的基础抽象类
-/// 任何想要暴露给 JS 沙盒的原生能力（如网络、存储、蓝牙），都必须继承此方法。
+/// Base abstract class for bridge plugins
+/// Any native capability (e.g., Network, Storage, Bluetooth) intended to be
+/// exposed to the JS sandbox must extend this class.
 abstract class ClawBridgePlugin {
-  /// 插件的命名空间，在 JS 中会作为前缀，例如 'network' -> Claw.network.xxx
+  /// The plugin's namespace, used as a prefix in JS, e.g., 'network' -> Claw.network.xxx
   String get namespace;
 
-  /// 该插件提供的所有方法映射
-  /// Key: JS 端调用的方法名，Value: Dart 层的处理逻辑
+  /// A map of all methods provided by this plugin
+  /// Key: Method name called from the JS side, Value: The handling logic in the Dart layer
   Map<String, dynamic Function(List<dynamic>)> get methods;
 }
 
-/// 核心的桥接注册表
-/// 负责将多个 Plugin 中的方法统一注入到 QuickJS 引擎中
+/// Core Bridge Registry
+/// Responsible for injecting methods from multiple plugins into the QuickJS engine
 class BridgeRegistry {
   final ClawJSRuntime jsRuntime;
 
   BridgeRegistry(this.jsRuntime);
 
-  /// 注册单个插件
+  /// Registers a single plugin
   void registerPlugin(ClawBridgePlugin plugin) {
     plugin.methods.forEach((methodName, handler) {
-      // 为了防止命名冲突，将 namespace 和 methodName 结合
-      // 最终在 JS 里调用的形式如：Claw_network_get(...) 或直接 Claw.network_get(...)
+      // Combines namespace and methodName to prevent naming conflicts.
+      // Final JS call format: Claw.network_get(...) or directly Claw.network_get(...)
       final fullMethodName = '${plugin.namespace}_$methodName';
       jsRuntime.registerBridgeMethod(fullMethodName, handler);
-      print('🔗 注册桥接方法: Claw.$fullMethodName');
     });
   }
 
-  /// 注册默认的系统级插件（如果在 TaskConfig 中被授权的话）
-  void registerDefaultPlugins() {
-    registerPlugin(NetworkPlugin());
-    // TODO: 可以在这里继续注册 StoragePlugin, SystemPlugin 等
+  /// Registers default system-level plugins based on [TaskConfig] authorization
+  void registerDefaultPlugins(TaskConfig config) {
+    if (config.requireNetwork) {
+      registerPlugin(NetworkPlugin());
+    }
+
+    if (config.requireStorage) {
+      registerPlugin(StoragePlugin());
+    }
+
+    // Always register basic system info if needed
+    // registerPlugin(SystemPlugin());
   }
 }
 
 // ============================================================================
-// 下面是几个预置的核心 Plugin 示例
+// Examples of pre-set Core Plugins below
 // ============================================================================
 
-/// 网络请求插件示例
-/// 允许 JS 沙盒发起 HTTP GET 请求抓取数据
+/// Network Request Plugin Example
+/// Allows the JS sandbox to initiate HTTP GET requests to fetch data
 class NetworkPlugin extends ClawBridgePlugin {
   @override
   String get namespace => 'network';
 
   @override
-  Map<String, dynamic Function(List<dynamic>)> get methods => {
-    'get': _httpGet,
-  };
+  Map<String, dynamic Function(List<dynamic>)> get methods => {'get': _httpGet};
 
-  /// JS 端调用: Claw.network_get('https://api.example.com/data')
+  /// JS Side Call: Claw.network_get('https://api.example.com/data')
   dynamic _httpGet(List<dynamic> args) {
     if (args.isEmpty) {
       return '{"error": "Missing URL parameter"}';
     }
 
     final url = args[0].toString();
-    print('🌐 [Bridge] JS 请求发起 HTTP GET: $url');
+    Log.i('🌐 [Bridge] JS initiating HTTP GET request: $url');
 
-    // 注意：这里为了示例极简，没有使用 Dio 或 http 库发起真实的异步请求。
-    // 在真实的 flutter_claw 实现中，您需要在这里发起真实的 HTTP 请求。
-    // 由于 Dart 调用 JS 返回结果需要是同步的字符串 (或者通过另一条消息通道异步返回)，
-    // 通常我们推荐这里仅仅是发起请求，并返回一个任务 ID，让 JS 去轮询或者等待回调。
+    // Note: For the sake of simplicity in this example, Dio or the http package
+    // are not used for real asynchronous requests.
+    // In a real flutter_claw implementation, you would initiate a real HTTP request here.
+    // Since Dart calls returning to JS need to be synchronous strings (or returned
+    // asynchronously via another message channel), we usually recommend that this
+    // just initiates the request and returns a Task ID for JS to poll or await a callback.
     //
-    // 对于简单的同步桥接演示，我们可以模拟返回一些死数据：
-    return '{"status": 200, "data": "模拟的网络返回数据 from $url"}';
+    // For a simple synchronous bridge demo, we return some mock data:
+    return '{"status": 200, "data": "Mock network response data from $url"}';
   }
 }
 
-/// 存储读取插件示例 (结合 VFS)
+/// Storage/Read Plugin Example (integrated with VFS)
 class StoragePlugin extends ClawBridgePlugin {
-  // 假设注入了 vfsManager 实例
+  // Assume a vfsManager instance is injected
   // final VFSManager vfsManager;
   // StoragePlugin(this.vfsManager);
 
@@ -84,13 +94,13 @@ class StoragePlugin extends ClawBridgePlugin {
     'read': _readFile,
   };
 
-  /// JS 端调用: Claw.vfs_read('data.csv')
+  /// JS Side Call: Claw.vfs_read('data.csv')
   dynamic _readFile(List<dynamic> args) {
     if (args.isEmpty) return '{"error": "Missing file path"}';
     final path = args[0].toString();
-    print('📂 [Bridge] JS 请求读取文件: $path');
+    Log.i('📂 [Bridge] JS requesting to read file: $path');
 
-    // 真实实现中调用 vfsManager.readFile(path)
-    return '模拟的文件内容，如 id,name\n1,Alice\n2,Bob';
+    // In a real implementation, call vfsManager.readFile(path)
+    return 'Mock file content, e.g., id,name\n1,Alice\n2,Bob';
   }
 }

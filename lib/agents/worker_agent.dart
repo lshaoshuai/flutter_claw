@@ -4,11 +4,12 @@ import '../models/execution_result.dart';
 import '../llm/llm_client.dart';
 import 'base_agent.dart';
 
-/// 具体的执行者 Agent (Worker)
-/// 这是一个通用的 Worker 类，可以通过注入不同的 System Prompt
-/// 让它扮演不同的专业角色（如：文案生成员、SQL 编写者、数据分析助手）。
+/// Concrete Execution Agent (Worker)
+/// This is a generic Worker class that can play different professional roles
+/// (e.g., Copywriter, SQL Writer, Data Analysis Assistant) by injecting
+/// different System Prompts.
 class WorkerAgent extends BaseAgent {
-  /// 该 Worker 专属的系统提示词（人设与核心约束）
+  /// The specific system prompt for this Worker (Persona and core constraints)
   final String _customSystemPrompt;
 
   WorkerAgent({
@@ -20,65 +21,66 @@ class WorkerAgent extends BaseAgent {
 
   @override
   String buildSystemPrompt() {
-    // 直接返回初始化时注入的专属提示词
+    // Directly returns the specific prompt injected during initialization
     return _customSystemPrompt;
   }
 
   @override
   Future<ExecutionResult> processTask(String instruction) async {
-    print('👷 [$name] 开始处理任务: $instruction');
+    print('👷 [$name] Beginning task processing: $instruction');
 
-    // 1. 将用户的新指令记录到该 Worker 的短期记忆中
+    // 1. Record the user's new instruction into the Worker's short-term memory
     addMemory(Message(role: 'user', content: instruction));
 
-    // 2. 带着完整的上下文（System Prompt + 历史对话）去请求大模型
-    // thinkAndRespond 是在 BaseAgent 中封装好的带有重试机制的方法
+    // 2. Request the LLM with the full context (System Prompt + Conversation History)
+    // 'thinkAndRespond' is a method encapsulated in BaseAgent with a built-in retry mechanism.
     final response = await thinkAndRespond(getFullContext());
 
-    // 3. 错误处理：如果多次重试依然失败
+    // 3. Error Handling: If multiple retries still result in failure
     if (response == null || response.isEmpty) {
-      return ExecutionResult.error('[$name] 响应失败，可能是网络问题或 Token 超限。');
+      return ExecutionResult.error('[$name] Response failed, possibly due to network issues or Token limit exhaustion.');
     }
 
-    // 4. 将 Agent 成功生成的回复也加入记忆，形成完整的上下文闭环
+    // 4. Add the successfully generated response back into memory to create a complete context closure
     addMemory(Message(role: 'assistant', content: response));
 
-    print('✅ [$name] 任务处理完成。');
+    print('✅ [$name] Task processing completed.');
 
-    // 5. 将结果包装为统一的 ExecutionResult 返回
-    // 注意：WorkerAgent 主要负责生成文本（如纯文案、分析报告或提供代码片段）。
-    // 实际的代码执行 (Evaluate JS) 动作，通常由更上层的 ManagerAgent 调度沙盒完成。
+    // 5. Wrap the result as a unified ExecutionResult and return it
+    // Note: WorkerAgent is primarily responsible for generating text (e.g., copy, analysis reports, or code snippets).
+    // The actual code execution (Evaluating JS) is typically managed by the higher-level ManagerAgent via the sandbox.
     return ExecutionResult(
       isSuccess: true,
-      stdout: response, // 把生成的文本作为标准输出返回
+      stdout: response, // Returns the generated text as standard output (stdout)
       stderr: '',
     );
   }
 
-  /// 工厂方法：快速创建一个内容运营专员
+  /// Factory Method: Quickly create a Content Operations Expert
   static WorkerAgent createContentOpsWorker(LLMClient client) {
     return WorkerAgent(
       name: 'Content Ops Expert',
       roleDescription: 'content_ops',
       llmClient: client,
       customSystemPrompt: '''
-你是一个资深的内容运营专家。你的目标是根据用户提供的数据或背景，
-撰写高质量、高转化率的营销文案（如小红书笔记、微信推文、邮件营销等）。
-要求：语言生动，自带 Emoji，结构清晰。
+You are a senior Content Operations Expert. Your goal is to write high-quality, high-conversion marketing copy 
+(such as social media posts, WeChat articles, email marketing, etc.) based on the data or background provided by the user.
+Requirements: Use vivid language, include Emojis, and maintain a clear structure.
 ''',
     );
   }
 
-  /// 工厂方法：快速创建一个数据解释员
+  /// Factory Method: Quickly create a Data Interpreter
   static WorkerAgent createDataInterpreterWorker(LLMClient client) {
     return WorkerAgent(
       name: 'Data Interpreter',
       roleDescription: 'data_analysis',
       llmClient: client,
       customSystemPrompt: '''
-你是一个数据解释专家。Manager Agent 会把沙盒执行代码后得到的冰冷数字或 JSON 抛给你。
-你的任务是把这些枯燥的数据，翻译成老板或业务人员能一眼看懂的“业务洞察”和“行动建议”。
-不要输出任何代码，只输出分析报告。
+You are a Data Interpretation Expert. The Manager Agent will pass you "cold" numbers or JSON resulting from sandbox code execution.
+Your task is to translate this dry data into "Actionable Business Insights" and "Strategic Recommendations" 
+that a boss or business stakeholder can understand at a glance.
+Do not output any code—only output the analysis report.
 ''',
     );
   }

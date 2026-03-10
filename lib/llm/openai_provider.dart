@@ -19,23 +19,27 @@ class OpenAIProvider implements LLMClient {
   });
 
   @override
-  Future<String> chat(List<Message> messages) async {
-    return _callOpenAIApi(messages, isJsonMode: false);
+  Duration get defaultTimeout => const Duration(seconds: 45);
+
+  @override
+  Future<String> chat(List<Message> messages, {Duration? timeout}) async {
+    return _callOpenAIApi(messages, isJsonMode: false, timeout: timeout);
   }
 
   @override
-  Future<String> generateJson(String prompt) async {
+  Future<String> generateJson(String prompt, {Duration? timeout}) async {
     // 💡 OpenAI API 强制要求：如果开启了 json_object 模式，
     // 系统提示词或用户提示词中必须显式要求模型输出 JSON。
     final messages = [
       Message.system('You are a helpful assistant designed to output JSON.'),
       Message.user(prompt)
     ];
-    return _callOpenAIApi(messages, isJsonMode: true);
+    return _callOpenAIApi(messages, isJsonMode: true, timeout: timeout);
   }
 
   /// 核心的 OpenAI API 调用逻辑
-  Future<String> _callOpenAIApi(List<Message> messages, {required bool isJsonMode}) async {
+  Future<String> _callOpenAIApi(List<Message> messages,
+      {required bool isJsonMode, Duration? timeout}) async {
     final url = Uri.parse('$baseUrl/chat/completions');
 
     // 1. 转换 Message 为 OpenAI API 需要的格式
@@ -69,7 +73,7 @@ class OpenAIProvider implements LLMClient {
           'Authorization': 'Bearer $apiKey',
         },
         body: jsonEncode(payload),
-      );
+      ).timeout(timeout ?? defaultTimeout);
 
       // 处理中文字符编码问题 (UTF-8)
       final responseBody = utf8.decode(response.bodyBytes);

@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_js: ^0.8.7
   path_provider: ^2.1.5
+  logger: ^2.6.2
 
 dev_dependencies:
   flutter_test:

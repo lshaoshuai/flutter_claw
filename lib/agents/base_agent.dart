@@ -3,35 +3,35 @@ import '../models/message.dart';
 import '../models/execution_result.dart';
 import '../llm/llm_client.dart';
 
-/// Agent 的运行状态枚举
+/// Enum representing the Agent's operational status
 enum AgentStatus {
-  idle,       // 空闲状态
-  thinking,   // 思考中 (正在请求 LLM)
-  executing,  // 执行中 (正在跑代码或调用工具)
-  waitingForHuman, // 等待人类介入审批 (如: 准备发送群发邮件前)
-  error,      // 运行出错
-  completed   // 任务成功完成
+  idle,            // Idle state
+  thinking,        // Thinking (Requesting LLM)
+  executing,       // Executing (Running code or calling tools)
+  waitingForHuman, // Awaiting human intervention/approval (e.g., before sending bulk emails)
+  error,           // Operational error
+  completed        // Task successfully finished
 }
 
-/// 抽象基础 Agent 类
-/// 所有的运营 Agent (无论是数据分析、还是内容生成) 都应该继承自此类
+/// Abstract Base Agent Class
+/// All operational Agents (whether for data analysis or content generation) should inherit from this class.
 abstract class BaseAgent {
-  /// 每个 Agent 必须有一个名字标识自己 (如 "Data Analyst Agent")
+  /// Each Agent must have a name to identify itself (e.g., "Data Analyst Agent")
   final String name;
 
-  /// 该 Agent 所属的领域 (如 "data_ops")
+  /// The domain/role this Agent belongs to (e.g., "data_ops")
   final String roleDescription;
 
-  /// 驱动该 Agent 思考的大脑 (LLM 客户端)
+  /// The "Brain" driving this Agent's reasoning (LLM Client)
   final LLMClient llmClient;
 
-  /// Agent 当前的状态 (供 UI 层监听并展示给用户看)
+  /// Current state of the Agent (for the UI layer to listen and display to users)
   AgentStatus _status = AgentStatus.idle;
 
-  /// Agent 自身的长期记忆/对话历史 (用于维护多轮对话的上下文)
+  /// The Agent's long-term memory/conversation history (used to maintain multi-turn dialogue context)
   final List<Message> _memory = [];
 
-  /// 状态变更流 (供外部如 Flutter Bloc/Provider 监听，实现 UI 实时刷新)
+  /// Status change stream (for external listeners like Flutter Bloc/Provider to implement real-time UI updates)
   final StreamController<AgentStatus> _statusController = StreamController<AgentStatus>.broadcast();
 
   BaseAgent({
@@ -41,42 +41,42 @@ abstract class BaseAgent {
   });
 
   // ==========================================
-  // 核心抽象方法：子类必须实现
+  // Core Abstract Methods: Must be implemented by subclasses
   // ==========================================
 
-  /// 子类必须实现的核心处理逻辑：Agent 收到任务后具体要怎么干活
+  /// Core processing logic: Defines exactly how the Agent works after receiving a task.
   Future<ExecutionResult> processTask(String instruction);
 
-  /// 子类必须实现的：构建该 Agent 独有的 System Prompt (人设与能力定义)
+  /// Subclasses must implement this to build the Agent's unique System Prompt (persona and capability definition).
   String buildSystemPrompt();
 
   // ==========================================
-  // 公共功能：子类直接复用
+  // Public Functionality: Reused by subclasses
   // ==========================================
 
-  /// 获取当前状态
+  /// Gets the current status
   AgentStatus get status => _status;
 
-  /// 监听状态变化 (UI 层用)
+  /// Listens to status changes (for UI layer use)
   Stream<AgentStatus> get statusStream => _statusController.stream;
 
-  /// 供子类在执行过程中更新状态
+  /// Updates status during execution (used by subclasses)
   void updateStatus(AgentStatus newStatus) {
     if (_status != newStatus) {
       _status = newStatus;
       _statusController.add(_status);
-      print('🤖 [$name] 状态变更为: ${newStatus.name}');
+      print('🤖 [$name] Status changed to: ${newStatus.name}');
     }
   }
 
-  /// 向该 Agent 的记忆池中添加对话上下文
+  /// Adds dialogue context to the Agent's memory pool
   void addMemory(Message message) {
     _memory.add(message);
-    // TODO(Optimization): 在这里可以引入一个滑动窗口机制，防止 _memory 撑爆 Token。
-    // 如果 _memory 超过 20 条，强制裁剪最早的对话。
+    // TODO(Optimization): Implement a sliding window mechanism here to prevent memory from exceeding Token limits.
+    // e.g., If _memory exceeds 20 items, force-trim the earliest dialogues.
   }
 
-  /// 获取完整的对话历史 (注入了 System Prompt)
+  /// Retrieves the full conversation history (with System Prompt injected)
   List<Message> getFullContext() {
     return [
       Message(role: 'system', content: buildSystemPrompt()),
@@ -84,23 +84,23 @@ abstract class BaseAgent {
     ];
   }
 
-  /// 清空该 Agent 的短期记忆
+  /// Clears the Agent's short-term memory
   void clearMemory() {
     _memory.clear();
     updateStatus(AgentStatus.idle);
-    print('🧹 [$name] 记忆已清空，重置为空闲状态。');
+    print('🧹 [$name] Memory cleared, reset to idle state.');
   }
 
-  /// 销毁 Agent (释放 Stream 资源)
+  /// Disposes of the Agent (releases Stream resources)
   void dispose() {
     _statusController.close();
   }
 
   // ==========================================
-  // 通用 LLM 交互封装：带有重试机制和状态扭转
+  // Generic LLM Interaction Wrapper: With retry mechanism and state transition
   // ==========================================
 
-  /// 发起一轮对话请求 (自动处理 thinking 状态和错误捕获)
+  /// Initiates a dialogue request (automatically handles 'thinking' state and error capturing)
   Future<String?> thinkAndRespond(List<Message> context, {int retries = 2}) async {
     updateStatus(AgentStatus.thinking);
     int attempts = 0;
@@ -112,13 +112,13 @@ abstract class BaseAgent {
         updateStatus(AgentStatus.idle);
         return response;
       } catch (e) {
-        print('⚠️ [$name] 请求大模型失败 (尝试 $attempts/$retries): $e');
+        print('⚠️ [$name] LLM request failed (Attempt $attempts/$retries): $e');
         if (attempts >= retries) {
           updateStatus(AgentStatus.error);
-          return null; // 彻底失败
+          return null; // Terminal failure
         }
-        // 指数退避重试 (简单的 2 秒延迟)
-        await Future.delayed(Duration(seconds: 2));
+        // Basic exponential backoff (simple 2-second delay)
+        await Future.delayed(const Duration(seconds: 2));
       }
     }
     return null;

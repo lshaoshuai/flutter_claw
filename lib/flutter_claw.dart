@@ -23,13 +23,15 @@ export 'sandbox/js_runtime.dart';
 export 'llm/llm_client.dart';
 export 'llm/gemini_provider.dart';
 
-
 // ============================================================================
 // 2. 核心门面类 (Facade) - 提供极简的初始化和调用入口
 // ============================================================================
 
+import 'package:flutter_claw/utils/logger.dart';
+
 import 'models/execution_result.dart';
 import 'agents/manager_agent.dart';
+import 'models/task_config.dart';
 import 'sandbox/js_runtime.dart';
 import 'llm/llm_client.dart';
 import 'bridge/bridge_registry.dart';
@@ -37,7 +39,9 @@ import 'bridge/bridge_registry.dart';
 class FlutterClaw {
   // 单例模式，确保整个 App 只有一个全局的 Agent OS 调度中心
   static final FlutterClaw _instance = FlutterClaw._internal();
+
   factory FlutterClaw() => _instance;
+
   FlutterClaw._internal();
 
   late ManagerAgent _managerAgent;
@@ -46,12 +50,16 @@ class FlutterClaw {
 
   /// 初始化 Agent OS 环境
   /// [llmClient] 注入你封装好的大模型请求客户端
+  /// [defaultConfig] 默认的任务配置
   /// [customBridges] 如果你需要注入自定义的原生方法（如操作特定的本地数据库），在这里传入
   Future<void> init({
     required LLMClient llmClient,
+    TaskConfig? defaultConfig,
     List<ClawBridgePlugin>? customBridges,
   }) async {
     if (_isInitialized) return;
+
+    final config = defaultConfig ?? TaskConfig(taskId: 'flutter_claw_system');
 
     // 1. 初始化 JS 沙盒引擎 (QuickJS)
     _jsRuntime = ClawJSRuntime();
@@ -59,7 +67,7 @@ class FlutterClaw {
 
     // 2. 注册基础原生能力 (网络、存储等)
     final registry = BridgeRegistry(_jsRuntime);
-    registry.registerDefaultPlugins();
+    registry.registerDefaultPlugins(config);
 
     // 注册业务方自定义的插件
     if (customBridges != null) {
@@ -72,21 +80,22 @@ class FlutterClaw {
     _managerAgent = ManagerAgent(
       llmClient: llmClient,
       jsRuntime: _jsRuntime,
+      defaultConfig: config,
     );
 
     _isInitialized = true;
-    print('🦀 FlutterClaw OS Initialized Successfully.');
+    Log.i('🦀 FlutterClaw OS Initialized Successfully.');
   }
 
   /// 提交一个运营任务给 Agent OS
   /// 例如: "去拉取一下本地 user_data.csv，计算昨天的 DAU 并返回"
-  Future<ExecutionResult> executeTask(String instruction) async {
+  Future<ExecutionResult> executeTask(String instruction, {TaskConfig? config}) async {
     if (!_isInitialized) {
       throw Exception('FlutterClaw is not initialized. Call init() first.');
     }
 
     // 把任务丢给 Manager Agent 进行路由、代码生成和本地执行
-    return await _managerAgent.process(instruction);
+    return await _managerAgent.process(instruction, config: config);
   }
 
   /// 释放底层 C++ / JS 引擎内存，防止内存泄漏

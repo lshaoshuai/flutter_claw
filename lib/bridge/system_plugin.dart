@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import '../utils/logger.dart';
 import 'bridge_registry.dart';
 
-/// 系统能力插件
-/// 允许 JS 沙盒调用原生的系统级交互，如震动、剪贴板等。
+/// System Capabilities Plugin
+/// Allows the JS sandbox to invoke native system-level interactions, such as vibration, clipboard access, etc.
 class SystemPlugin extends ClawBridgePlugin {
   @override
   String get namespace => 'sys';
@@ -15,8 +16,8 @@ class SystemPlugin extends ClawBridgePlugin {
     'getDeviceInfo': _getDeviceInfo,
   };
 
-  /// JS 端调用: Claw.sys_vibrate()
-  /// 触发设备短暂震动
+  /// JS Side Call: Claw.sys_vibrate()
+  /// Triggers a short device vibration
   dynamic _vibrate(List<dynamic> args) {
     try {
       HapticFeedback.vibrate();
@@ -26,23 +27,23 @@ class SystemPlugin extends ClawBridgePlugin {
     }
   }
 
-  /// JS 端调用: Claw.sys_copyToClipboard('Hello World')
+  /// JS Side Call: Claw.sys_copyToClipboard('Hello World')
   dynamic _copyToClipboard(List<dynamic> args) {
     if (args.isEmpty) return '{"error": "Missing text parameter"}';
     final text = args[0].toString();
 
-    // 注意：剪贴板操作在 Flutter 中是异步的，但通常非常快。
-    // 为了简单起见，这里采用即发即忘(Fire-and-forget)模式，不等待结果。
+    // Note: Clipboard operations in Flutter are asynchronous, but usually very fast.
+    // For simplicity, we use a "fire-and-forget" pattern here without awaiting the result.
     Clipboard.setData(ClipboardData(text: text));
-    print('📋 [SystemPlugin] JS 已将内容复制到剪贴板');
+    Log.i('📋 [SystemPlugin] JS has copied content to the clipboard');
     return '{"status": "success"}';
   }
 
-  /// JS 端调用: const info = Claw.sys_getDeviceInfo()
-  /// 返回简单的设备标识，可用于运营打点
+  /// JS Side Call: const info = Claw.sys_getDeviceInfo()
+  /// Returns a simple device identifier, useful for operational tracking/analytics.
   dynamic _getDeviceInfo(List<dynamic> args) {
-    // 真实应用中，可以使用 device_info_plus 插件获取真实的手机型号
-    // 这里做个简单的占位模拟
+    // In a real-world application, use the 'device_info_plus' plugin to get actual phone models.
+    // This is a simple placeholder simulation.
     final info = {
       'os': 'Android/iOS (Simulated)',
       'version': '1.0.0',

@@ -1,17 +1,18 @@
-/// 标准化的执行结果模型
-/// 无论是大模型的纯文本生成，还是 QuickJS 沙盒的代码执行，
-/// 最终都会封装成这个对象返回给调用方。
+/// Standardized Execution Result Model
+/// Whether it's plain text generation from an LLM or code execution
+/// within the QuickJS sandbox, the final output is encapsulated
+/// in this object and returned to the caller.
 class ExecutionResult {
-  /// 是否执行成功
+  /// Indicates whether the execution was successful
   final bool isSuccess;
 
-  /// 标准输出 (对应 JS 里的 console.log 或最终的返回数据)
+  /// Standard output (corresponds to console.log in JS or the final returned data)
   final String stdout;
 
-  /// 标准错误 (对应 JS 里的异常堆栈或语法错误信息)
+  /// Standard error (corresponds to exception stacks or syntax error messages in JS)
   final String stderr;
 
-  /// 执行耗时 (毫秒)，可用于性能监控
+  /// Execution duration (in milliseconds), useful for performance monitoring
   final int? executionTimeMs;
 
   ExecutionResult({
@@ -21,7 +22,7 @@ class ExecutionResult {
     this.executionTimeMs,
   });
 
-  /// 快速构造成功结果
+  /// Factory method to quickly construct a successful result
   factory ExecutionResult.success(String output, {int? timeMs}) {
     return ExecutionResult(
       isSuccess: true,
@@ -30,7 +31,7 @@ class ExecutionResult {
     );
   }
 
-  /// 快速构造失败/报错结果
+  /// Factory method to quickly construct a failure/error result
   factory ExecutionResult.error(String errorMsg, {int? timeMs}) {
     return ExecutionResult(
       isSuccess: false,
@@ -39,7 +40,7 @@ class ExecutionResult {
     );
   }
 
-  /// 转换为 JSON 格式，方便记录日志或进行网络传输
+  /// Converts to JSON format for convenient logging or network transmission
   Map<String, dynamic> toJson() {
     return {
       'isSuccess': isSuccess,

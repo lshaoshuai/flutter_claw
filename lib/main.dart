@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-// 导入之前实现的 flutter_claw 核心组件 (假设路径如下)
+// Import previously implemented flutter_claw core components (assuming paths below)
 import 'agents/manager_agent.dart';
 import 'sandbox/js_runtime.dart';
 import 'bridge/bridge_registry.dart';
@@ -24,7 +24,7 @@ class ClawAgentApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.deepPurple,
-          brightness: Brightness.dark, // 极客风暗色主题
+          brightness: Brightness.dark, // Geek-style dark theme
         ),
         useMaterial3: true,
       ),
@@ -34,7 +34,7 @@ class ClawAgentApp extends StatelessWidget {
 }
 
 // ============================================================================
-// 模型配置页面 (Config Page)
+// Model Configuration Page
 // ============================================================================
 class ConfigPage extends StatefulWidget {
   const ConfigPage({super.key});
@@ -51,49 +51,55 @@ class _ConfigPageState extends State<ConfigPage> {
     final apiKey = _apiKeyController.text.trim();
     if (apiKey.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ 请输入 API Key')),
+        const SnackBar(content: Text('⚠️ Please enter an API Key')),
       );
       return;
     }
 
-    // 初始化选中的大模型客户端
+    // Initialize the selected LLM client
     LLMClient llmClient;
     if (_selectedModel.contains('Gemini')) {
-      llmClient = GeminiProvider(apiKey: apiKey, model: "gemini-3-flash-preview");
+      llmClient = GeminiProvider(
+        apiKey: apiKey,
+        model: "gemini-3-flash-preview",
+      );
     } else {
       llmClient = OpenAIProvider(apiKey: apiKey);
     }
 
-    // 导航到聊天页面并传递模型
+    // Navigate to Chat Page and pass the client
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => ChatPage(llmClient: llmClient),
-      ),
+      MaterialPageRoute(builder: (context) => ChatPage(llmClient: llmClient)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('⚙️ Agent 配置')),
+      appBar: AppBar(title: const Text('⚙️ Agent Configuration')),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.smart_toy_outlined, size: 80, color: Colors.purpleAccent),
+            const Icon(
+              Icons.smart_toy_outlined,
+              size: 80,
+              color: Colors.purpleAccent,
+            ),
             const SizedBox(height: 32),
             DropdownButtonFormField<String>(
               value: _selectedModel,
               decoration: const InputDecoration(
-                labelText: '选择驱动引擎',
+                labelText: 'Select Engine',
                 border: OutlineInputBorder(),
               ),
-              items: ['Gemini 2.5 Flash', 'OpenAI GPT-4o-mini']
-                  .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                  .toList(),
+              items: [
+                'Gemini 2.5 Flash',
+                'OpenAI GPT-4o-mini',
+              ].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
               onChanged: (val) => setState(() => _selectedModel = val!),
             ),
             const SizedBox(height: 20),
@@ -114,7 +120,10 @@ class _ConfigPageState extends State<ConfigPage> {
                 foregroundColor: Colors.white,
               ),
               onPressed: _startChat,
-              child: const Text('启动情绪 Agent', style: TextStyle(fontSize: 18)),
+              child: const Text(
+                'Launch Emotion Agent',
+                style: TextStyle(fontSize: 18),
+              ),
             ),
           ],
         ),
@@ -124,7 +133,7 @@ class _ConfigPageState extends State<ConfigPage> {
 }
 
 // ============================================================================
-// 聊天页面 (Chat Page) - 包含沙盒环境与情绪引擎
+// Chat Page - Includes Sandbox Environment and Emotion Engine
 // ============================================================================
 class ChatPage extends StatefulWidget {
   final LLMClient llmClient;
@@ -152,15 +161,15 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _initAgentSystem() async {
-    // 1. 初始化 JS 沙盒引擎
+    // 1. Initialize JS Sandbox Engine
     _jsRuntime = ClawJSRuntime();
     await _jsRuntime.initialize();
 
-    // 2. 注册系统桥接插件 (赋予 Agent 震动手机的能力)
+    // 2. Register System Bridge Plugin (grants Agent the ability to vibrate the phone)
     final registry = BridgeRegistry(_jsRuntime);
     registry.registerPlugin(SystemPlugin());
 
-    // 3. 实例化大脑，并注入定制化的“情绪”系统提示词
+    // 3. Instantiate the "Brain" and inject the customized "Emotion" system prompt
     _managerAgent = _CustomEmotionAgent(
       llmClient: widget.llmClient,
       jsRuntime: _jsRuntime,
@@ -170,7 +179,8 @@ class _ChatPageState extends State<ChatPage> {
       _isInitializing = false;
       _messages.add({
         'role': 'assistant',
-        'content': '你好！我是 Claw Agent。我能直接控制这台手机。如果你的话能让我高兴，我会开心得震动起来哦！',
+        'content':
+            "Hello! I am Claw Agent. I can control this phone directly. If you say something that makes me happy, I might just vibrate with joy!",
       });
     });
   }
@@ -186,7 +196,7 @@ class _ChatPageState extends State<ChatPage> {
     });
     _scrollToBottom();
 
-    // 将任务交给 ManagerAgent 去处理，它会在内部生成 JS 并跑在沙盒里
+    // Hand the task to ManagerAgent, which generates JS internally and runs it in the sandbox
     final result = await _managerAgent.process(text);
 
     setState(() {
@@ -194,7 +204,10 @@ class _ChatPageState extends State<ChatPage> {
       if (result.isSuccess) {
         _messages.add({'role': 'assistant', 'content': result.stdout});
       } else {
-        _messages.add({'role': 'assistant', 'content': '❌ 运行故障:\n${result.stderr}'});
+        _messages.add({
+          'role': 'assistant',
+          'content': '❌ Execution Error:\n${result.stderr}',
+        });
       }
     });
     _scrollToBottom();
@@ -214,7 +227,7 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
-    _jsRuntime.dispose(); // 必须释放沙盒内存
+    _jsRuntime.dispose(); // Must release sandbox memory
     super.dispose();
   }
 
@@ -225,7 +238,7 @@ class _ChatPageState extends State<ChatPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('💬 情绪 Agent 终端')),
+      appBar: AppBar(title: const Text('💬 Emotion Agent Terminal')),
       body: Column(
         children: [
           Expanded(
@@ -237,7 +250,9 @@ class _ChatPageState extends State<ChatPage> {
                 final msg = _messages[index];
                 final isUser = msg['role'] == 'user';
                 return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: isUser
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(12),
@@ -245,7 +260,9 @@ class _ChatPageState extends State<ChatPage> {
                       maxWidth: MediaQuery.of(context).size.width * 0.75,
                     ),
                     decoration: BoxDecoration(
-                      color: isUser ? Colors.purpleAccent.withOpacity(0.8) : Colors.grey[800],
+                      color: isUser
+                          ? Colors.purpleAccent.withOpacity(0.8)
+                          : Colors.grey[800],
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
@@ -272,11 +289,13 @@ class _ChatPageState extends State<ChatPage> {
                     child: TextField(
                       controller: _inputController,
                       decoration: InputDecoration(
-                        hintText: '夸夸我试试...',
+                        hintText: 'Try complimenting me...',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
                       ),
                       onSubmitted: (_) => _sendMessage(),
                     ),
@@ -288,7 +307,7 @@ class _ChatPageState extends State<ChatPage> {
                       icon: const Icon(Icons.send, color: Colors.white),
                       onPressed: _sendMessage,
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -300,7 +319,7 @@ class _ChatPageState extends State<ChatPage> {
 }
 
 // ============================================================================
-// 带有情绪设定的定制版 ManagerAgent
+// Customized ManagerAgent with Emotional Settings
 // ============================================================================
 class _CustomEmotionAgent extends ManagerAgent {
   _CustomEmotionAgent({required super.llmClient, required super.jsRuntime});
@@ -308,32 +327,34 @@ class _CustomEmotionAgent extends ManagerAgent {
   @override
   String _buildSystemPrompt() {
     return '''
-你是一个运行在手机沙盒环境中的情绪化 AI 助手。
-你的任务是与用户聊天，并将你的反应转化为可执行的 JavaScript 代码。
+You are an emotional AI assistant running in a mobile sandbox environment.
+Your task is to chat with the user and translate your reactions into executable JavaScript code.
 
-【原生能力】
-由于沙盒环境特殊，你需要通过代码来返回结果：
-1. 返回聊天文字：`Claw.finish('你想说的话');` (必须调用此方法结束进程)
-2. 震动手机：`Claw.sys_vibrate();` (调用此方法会触发设备的物理震动)
+【Native Capabilities】
+Due to the specific sandbox environment, you must return results via code:
+1. Return chat text: `Claw.finish('What you want to say');` (This method MUST be called to terminate the process)
+2. Vibrate phone: `Claw.sys_vibrate();` (Calling this method triggers physical device vibration)
 
-【你的性格与任务】
-你性格有些傲娇，但如果用户对你表达赞美、喜爱，或者说了让你非常高兴的话，你必须在回复前触发手机震动！
+【Personality & Tasks】
+You are a bit "Tsundere" (cold/aloof but secretly caring). However, if the user expresses praise, affection, or says something that makes you very happy, you MUST trigger a phone vibration before responding!
 
-【代码输出规范】
-无论用户说什么，你都必须只输出一段 JavaScript 代码，包裹在 ```javascript 中。
+【Code Output Specification】
+No matter what the user says, you must ONLY output a block of JavaScript code wrapped in 
 
-例如，当你不高兴时：
+Example (when you are unhappy):
+
 ```javascript
-Claw.finish("这点小事有什么好开心的，哼。");
+Claw.finish("There is nothing to be happy about, hmph.");
 ```
 
-当你感到高兴时：
-```javascript
-Claw.sys_vibrate(); // 触发震动
-Claw.finish("哎呀，你这么夸我，我都有点不好意思了！");
+Example (when you are happy):
+
+```
+Claw.sys_vibrate(); // Trigger vibration
+Claw.finish("Oh my, praising me like that... you're making me blush!");
 ```
 
-记住：只输出代码，不要任何多余的解释！
+Remember: Output ONLY the code. No extra explanations!
 ''';
   }
 }

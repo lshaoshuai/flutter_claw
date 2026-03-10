@@ -1,55 +1,66 @@
-import 'dart:developer' as developer;
+import 'package:logger/logger.dart';
 
-/// 内部日志工具类
-/// 用于统一管理 flutter_claw 的日志输出，支持多级别和一键开关。
-class ClawLogger {
-  /// 是否开启调试日志 (生产环境建议设为 false)
-  static bool enableDebug = true;
+class Log {
+  static final Logger _logger = Logger(
+    printer: PrettyPrinter(),
+  );
 
-  /// 打印通用信息 (如 Agent 的正常流转状态)
-  static void info(String message, {String tag = 'Claw'}) {
-    if (!enableDebug) return;
-    final logMsg = '🔵 [$tag] $message';
-    developer.log(logMsg, name: tag);
-    print(logMsg);
+  static void t(
+      dynamic message, {
+        DateTime? time,
+        Object? error,
+        StackTrace? stackTrace,
+      }) {
+    _logger.t(message, time: time, error: error, stackTrace: stackTrace);
   }
 
-  /// 打印警告信息 (如网络超时重试、Token 接近超限)
-  static void warning(String message, {String tag = 'Claw'}) {
-    if (!enableDebug) return;
-    final logMsg = '🟡 [$tag] $message';
-    developer.log(logMsg, name: tag, level: 900);
-    print(logMsg);
+  static void d(
+      dynamic message, {
+        DateTime? time,
+        Object? error,
+        StackTrace? stackTrace,
+      }) {
+    _logger.d(message, time: time, error: error, stackTrace: stackTrace);
   }
 
-  /// 打印严重错误信息 (如 JS 引擎崩溃、路径越权拦截)
-  /// 错误日志不受 enableDebug 控制，始终打印
-  static void error(String message, {Object? error, StackTrace? stackTrace, String tag = 'Claw'}) {
-    final logMsg = '🔴 [$tag] $message';
-    developer.log(logMsg, name: tag, error: error, stackTrace: stackTrace, level: 1000);
-    print(logMsg);
-
-    if (error != null) {
-      print('Exception: $error');
-    }
-    if (stackTrace != null) {
-      print('StackTrace: $stackTrace');
-    }
+  static void i(
+      dynamic message, {
+        DateTime? time,
+        Object? error,
+        StackTrace? stackTrace,
+      }) {
+    _logger.i(message, time: time, error: error, stackTrace: stackTrace);
   }
 
-  /// 打印成功状态 (如代码执行成功、路由分发完成)
-  static void success(String message, {String tag = 'Claw'}) {
-    if (!enableDebug) return;
-    final logMsg = '🟢 [$tag] $message';
-    developer.log(logMsg, name: tag);
-    print(logMsg);
+  static void w(
+      dynamic message, {
+        DateTime? time,
+        Object? error,
+        StackTrace? stackTrace,
+      }) {
+    _logger.w(message, time: time, error: error, stackTrace: stackTrace);
   }
 
-  /// 打印极客风的调试数据 (如完整的大模型请求 Payload、JS 堆栈)
-  static void debug(String message, {String tag = 'Claw Debug'}) {
-    if (!enableDebug) return;
-    final logMsg = '⚙️ [$tag] $message';
-    developer.log(logMsg, name: tag, level: 500);
-    print(logMsg);
+  static void e(
+      dynamic message, {
+        DateTime? time,
+        Object? error,
+        StackTrace? stackTrace,
+      }) {
+    _logger.e(message, time: time, error: error, stackTrace: stackTrace);
+  }
+
+
+  static void wtf(
+      dynamic message, {
+        DateTime? time,
+        Object? error,
+        StackTrace? stackTrace,
+      }) {
+    _logger.f(message, time: time, error: error, stackTrace: stackTrace);
+  }
+
+  static void info(String s) {
+    _logger.i(s);
   }
 }

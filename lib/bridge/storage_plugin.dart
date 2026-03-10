@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'bridge_registry.dart';
 import '../sandbox/vfs_manager.dart';
 
-/// 本地存储插件
-/// 允许 JS 沙盒安全地读写 VFS 工作区内的文件
+/// Local Storage Plugin
+/// Allows the JS sandbox to safely read and write files within the VFS workspace.
 class StoragePlugin extends ClawBridgePlugin {
   final VFSManager vfsManager;
 
@@ -18,14 +18,15 @@ class StoragePlugin extends ClawBridgePlugin {
     'write': _writeFile,
     'delete': _deleteFile,
     'list': _listFiles,
-    'getResult': _getResult, // 将获取结果的方法暴露出去
+    'getResult': _getResult, // Expose the method to retrieve task results
   };
 
-  /// JS 端调用: const content = Claw.vfs_read('data.csv');
-  /// 注意：文件读写在 Dart 中也是异步的。为了简化 JS 端的调用，
-  /// 对于小的本地文件读取，我们可以使用一种“伪同步”或者强制等待的模式。
-  /// 但由于 QuickJS 的 bridge 限制，这里我们采用与 NetworkPlugin 类似的
-  /// 异步任务分配 + 轮询获取结果的模式，以保证 Flutter 主线程的绝对流畅。
+  /// JS Side Call: const taskId = Claw.vfs_read('data.csv');
+  /// Note: File I/O in Dart is asynchronous. To simplify calls from the JS side,
+  /// we could use a "pseudo-synchronous" or forced-wait mode for small local files.
+  /// However, due to QuickJS bridge constraints, we adopt the same
+  /// "Async Task Assignment + Polling" pattern as NetworkPlugin to ensure
+  /// absolute smoothness of the Flutter main thread.
   dynamic _readFile(List<dynamic> args) {
     if (args.isEmpty) return '{"error": "Missing file path"}';
     final path = args[0].toString();
@@ -52,7 +53,7 @@ class StoragePlugin extends ClawBridgePlugin {
     }
   }
 
-  /// JS 端调用: const taskId = Claw.vfs_write('output.json', '{"key":"value"}');
+  /// JS Side Call: const taskId = Claw.vfs_write('output.json', '{"key":"value"}');
   dynamic _writeFile(List<dynamic> args) {
     if (args.length < 2) return '{"error": "Missing path or content"}';
     final path = args[0].toString();
@@ -77,7 +78,7 @@ class StoragePlugin extends ClawBridgePlugin {
     }
   }
 
-  /// JS 端调用: const taskId = Claw.vfs_delete('temp.txt');
+  /// JS Side Call: const taskId = Claw.vfs_delete('temp.txt');
   dynamic _deleteFile(List<dynamic> args) {
     if (args.isEmpty) return '{"error": "Missing file path"}';
     final path = args[0].toString();
@@ -101,7 +102,7 @@ class StoragePlugin extends ClawBridgePlugin {
     }
   }
 
-  /// JS 端调用: const taskId = Claw.vfs_list();
+  /// JS Side Call: const taskId = Claw.vfs_list();
   dynamic _listFiles(List<dynamic> args) {
     final taskId = 'vfs_list_${DateTime.now().millisecondsSinceEpoch}';
     _vfsCache[taskId] = '{"status": "pending"}';
@@ -125,12 +126,13 @@ class StoragePlugin extends ClawBridgePlugin {
     }
   }
 
-  // --- 统一的结果轮询接口 ---
-  // 用于缓存 VFS 异步操作的结果
+  // --- Unified Result Polling Interface ---
+  // Caches results of asynchronous VFS operations
   final Map<String, String> _vfsCache = {};
 
-  /// JS 端轮询获取结果，供大模型通过 while 循环获取真实读写状态
-  /// 统一调用: const result = Claw.vfs_getResult(taskId);
+  /// JS side polling for results. Used by the LLM to retrieve
+  /// actual read/write status through a while loop.
+  /// Unified call: const result = Claw.vfs_getResult(taskId);
   dynamic _getResult(List<dynamic> args) {
     if (args.isEmpty) return '{"error": "Missing taskId"}';
     final taskId = args[0].toString();
@@ -142,6 +144,8 @@ class StoragePlugin extends ClawBridgePlugin {
     final resultStr = _vfsCache[taskId]!;
     final resultMap = jsonDecode(resultStr);
 
+    // If the task is no longer 'pending' (completed/failed),
+    // remove it from cache after reading to prevent memory leaks.
     if (resultMap['status'] != 'pending') {
       _vfsCache.remove(taskId);
     }

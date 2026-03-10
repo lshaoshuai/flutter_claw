@@ -1,20 +1,21 @@
-/// 任务执行的配置模型
-/// 用于定义 Agent 执行单次任务时的边界条件、资源配额和权限限制。
+/// Task Execution Configuration Model
+/// Defines the boundary conditions, resource quotas, and permission restrictions
+/// when an Agent executes a single task.
 class TaskConfig {
-  /// 任务的唯一标识符 (可用于日志追踪和分配独立的 VFS 工作区)
+  /// Unique identifier for the task (useful for log tracing and assigning isolated VFS workspaces)
   final String taskId;
 
-  /// 沙盒执行 JS 代码的最大超时时间 (防止死循环卡死主线程)
+  /// Maximum timeout duration for sandbox JS execution (prevents infinite loops from freezing the main thread)
   final Duration timeout;
 
-  /// Agent 遇到执行报错时，允许自动 Debug 重写代码的最大尝试次数
+  /// Maximum number of automatic Debug/Rewrite attempts allowed when the Agent encounters execution errors
   final int maxRetries;
 
-  /// 该任务是否被授权访问网络
-  /// (如果为 false，原生层的 NetworkPlugin 应该直接拦截或不注入)
+  /// Whether the task is authorized to access the network
+  /// (If false, the native-layer NetworkPlugin should intercept requests or remain un-injected)
   final bool requireNetwork;
 
-  /// 该任务是否被授权读写本地的虚拟文件系统 (VFS)
+  /// Whether the task is authorized to read/write the local Virtual File System (VFS)
   final bool requireStorage;
 
   TaskConfig({
@@ -23,9 +24,28 @@ class TaskConfig {
     this.maxRetries = 3,
     this.requireNetwork = false,
     this.requireStorage = false,
-  });
+  })  : assert(taskId.isNotEmpty, 'taskId cannot be empty'),
+        assert(maxRetries >= 0, 'maxRetries cannot be negative'),
+        assert(timeout.inSeconds > 0, 'timeout must be positive');
 
-  /// 从 JSON 反序列化 (例如：从远端云控系统下发任务配置)
+  /// Creates a copy of this [TaskConfig] but with the given fields replaced with the new values.
+  TaskConfig copyWith({
+    String? taskId,
+    Duration? timeout,
+    int? maxRetries,
+    bool? requireNetwork,
+    bool? requireStorage,
+  }) {
+    return TaskConfig(
+      taskId: taskId ?? this.taskId,
+      timeout: timeout ?? this.timeout,
+      maxRetries: maxRetries ?? this.maxRetries,
+      requireNetwork: requireNetwork ?? this.requireNetwork,
+      requireStorage: requireStorage ?? this.requireStorage,
+    );
+  }
+
+  /// Deserialization from JSON (e.g., receiving task configurations from a remote Cloud Control system)
   factory TaskConfig.fromJson(Map<String, dynamic> json) {
     return TaskConfig(
       taskId: json['taskId'] as String? ?? 'default_task_${DateTime.now().millisecondsSinceEpoch}',
@@ -36,7 +56,7 @@ class TaskConfig {
     );
   }
 
-  /// 序列化为 JSON
+  /// Serialization to JSON
   Map<String, dynamic> toJson() {
     return {
       'taskId': taskId,

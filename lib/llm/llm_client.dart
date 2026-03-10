@@ -1,13 +1,18 @@
 import '../models/message.dart';
 
-/// LLM 客户端抽象接口
-/// 所有接入 flutter_claw 的大模型（Gemini, OpenAI, Claude 等）都必须实现此接口
+/// LLM Client Abstract Interface
+/// All Large Language Models (Gemini, OpenAI, Claude, etc.) integrated
+/// into flutter_claw must implement this interface.
 abstract class LLMClient {
-  /// 发起多轮对话，返回生成的纯文本回复
-  /// [messages] 包含上下文历史和当前的 Prompt
-  Future<String> chat(List<Message> messages);
+  /// Default timeout for LLM API calls
+  Duration get defaultTimeout => const Duration(seconds: 60);
 
-  /// 强制模型输出 JSON 格式的数据
-  /// 通常用于 RouterAgent 路由分发，或要求模型输出结构化配置时使用
-  Future<String> generateJson(String prompt);
+  /// Initiates a multi-turn dialogue and returns the generated plain-text response.
+  /// [messages] contains the context history and the current Prompt.
+  Future<String> chat(List<Message> messages, {Duration? timeout});
+
+  /// Forces the model to output data in JSON format.
+  /// Typically used for RouterAgent dispatching or when requiring the
+  /// model to output a structured configuration.
+  Future<String> generateJson(String prompt, {Duration? timeout});
 }

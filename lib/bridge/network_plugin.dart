@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'bridge_registry.dart';
 
-/// 真实的异步网络请求插件
-/// 解决了 Dart 同步回传与 HTTP 异步执行的冲突问题
+/// Real Asynchronous Network Request Plugin
+/// Resolves the conflict between Dart's synchronous return requirement
+/// and the asynchronous nature of HTTP execution.
 class NetworkPlugin extends ClawBridgePlugin {
-  // 用于缓存异步请求的结果
-  // Key: 任务ID (taskId), Value: 请求结果或报错信息
+  // Used to cache results of asynchronous requests
+  // Key: taskId, Value: Request result or error message
   final Map<String, String> _responseCache = {};
 
   @override
@@ -18,40 +19,40 @@ class NetworkPlugin extends ClawBridgePlugin {
     'getResult': _getFetchResult,
   };
 
-  /// JS 端调用: const taskId = Claw.network_fetch('https://api.example.com/data');
-  /// 这个方法是同步返回的，它只负责触发请求并返回一个 taskId。
+  /// JS Side Call: const taskId = Claw.network_fetch('https://api.example.com/data');
+  /// This method returns synchronously; it only triggers the request and returns a taskId.
   dynamic _startFetch(List<dynamic> args) {
     if (args.isEmpty) {
       return '{"error": "Missing URL parameter"}';
     }
 
     final url = args[0].toString();
-    // 生成一个简单的唯一任务 ID
+    // Generate a simple unique task ID
     final taskId = 'task_${DateTime.now().millisecondsSinceEpoch}_${url.hashCode}';
 
-    // 初始化缓存状态为 'pending'
+    // Initialize cache status as 'pending'
     _responseCache[taskId] = '{"status": "pending"}';
 
-    print('🌐 [NetworkPlugin] 收到异步 GET 请求: $url (TaskID: $taskId)');
+    print('🌐 [NetworkPlugin] Received async GET request: $url (TaskID: $taskId)');
 
-    // 真正发起异步 HTTP 请求 (不 await，让 JS 继续往下走)
+    // Trigger the actual async HTTP request (no await, allowing JS execution to continue)
     _executeRequest(taskId, url);
 
-    // 立即向 JS 返回 taskId
+    // Immediately return the taskId to JS
     return taskId;
   }
 
-  /// 真正的异步网络请求逻辑
+  /// Actual asynchronous network request logic
   Future<void> _executeRequest(String taskId, String url) async {
     try {
       final response = await http.get(Uri.parse(url));
 
-      // 请求完成，将结果写入缓存
+      // Request completed, write result to cache
       if (response.statusCode >= 200 && response.statusCode < 300) {
         _responseCache[taskId] = jsonEncode({
           'status': 'success',
           'statusCode': response.statusCode,
-          'body': response.body, // 注意：如果 body 是纯文本，可能需要处理转义
+          'body': response.body, // Note: If body is plain text, escaping might be required
         });
       } else {
         _responseCache[taskId] = jsonEncode({
@@ -60,19 +61,19 @@ class NetworkPlugin extends ClawBridgePlugin {
           'message': 'HTTP Request failed with status: ${response.statusCode}',
         });
       }
-      print('✅ [NetworkPlugin] 异步请求完成 (TaskID: $taskId)');
+      print('✅ [NetworkPlugin] Async request completed (TaskID: $taskId)');
     } catch (e) {
-      // 捕获网络异常 (如断网、DNS 解析失败)
+      // Catch network exceptions (e.g., disconnected, DNS resolution failure)
       _responseCache[taskId] = jsonEncode({
         'status': 'error',
         'message': e.toString(),
       });
-      print('❌ [NetworkPlugin] 异步请求失败 (TaskID: $taskId): $e');
+      print('❌ [NetworkPlugin] Async request failed (TaskID: $taskId): $e');
     }
   }
 
-  /// JS 端轮询调用: const result = Claw.network_getResult(taskId);
-  /// 返回 '{"status": "pending"}' 或 '{"status": "success", "body": "..."}'
+  /// JS Side Polling Call: const result = Claw.network_getResult(taskId);
+  /// Returns '{"status": "pending"}' or '{"status": "success", "body": "..."}'
   dynamic _getFetchResult(List<dynamic> args) {
     if (args.isEmpty) return '{"error": "Missing taskId parameter"}';
 
@@ -84,7 +85,7 @@ class NetworkPlugin extends ClawBridgePlugin {
 
     final resultStr = _responseCache[taskId]!;
 
-    // 如果任务已经完成（成功或失败），读取后清理缓存以防止内存泄漏
+    // If task is finished (success or error), clear cache after reading to prevent memory leaks
     final resultMap = jsonDecode(resultStr);
     if (resultMap['status'] != 'pending') {
       _responseCache.remove(taskId);
