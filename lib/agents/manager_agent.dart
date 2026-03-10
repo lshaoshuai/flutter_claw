@@ -134,9 +134,10 @@ Claw.finish(result);
   /// Extracts the code block from the LLM's Markdown response
   String _extractJSCode(String text) {
     // Regex logic:
-    // 1. (?:javascript|js)? matches code block start (optional language tag) // 2. \s* matches potential newlines // 3. ([\s\S]*?) group 1: matches everything until the closing
+    // 1. Matches the start of a markdown code block ``` optionally followed by js/javascript
+    // 2. Captures all content until the closing ```
     final RegExp codeBlockRegex = RegExp(
-      r'(?:javascript|js)?\s*([\s\S]*?)',
+      r'```(?:javascript|js)?\s*([\s\S]*?)```',
       caseSensitive: false,
     );
     final match = codeBlockRegex.firstMatch(text);

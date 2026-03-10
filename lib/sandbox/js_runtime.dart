@@ -71,21 +71,26 @@ class ClawJSRuntime {
         // Parse the JSON string array passed from JS into a Dart List
         List<dynamic> parsedArgs = [];
         if (args is List && args.isNotEmpty) {
+          // The JS side sends arguments as a JSON-stringified array within the first element of args
           parsedArgs = jsonDecode(args.first.toString());
         }
         // Invoke native processing logic
-        return handler(parsedArgs);
+        final result = handler(parsedArgs);
+        // Ensure result is returned to JS as a JSON string if it's not a primitive
+        return result is String ? result : jsonEncode(result);
       } catch (e, stack) {
         Log.e('❌ Bridge call error [$methodName]: $e', stackTrace: stack);
-        return '{"error": "${e.toString()}"}';
+        return jsonEncode({"error": e.toString()});
       }
     });
 
-      Log.i('🔗 Registered bridge method: Claw.$fullMethodName');
-      // 2. Inject the corresponding wrapper function into the JS layer
+    Log.i('🔗 Registered bridge method: Claw.$methodName');
+
+    // 2. Inject the corresponding wrapper function into the JS layer
     _runtime!.evaluate('''
       Claw.$methodName = function(...args) {
-        // flutter_js's sendMessage requires a channelName and string parameters
+        // flutter_js's sendMessage requires a channelName and an array of string parameters
+        // We stringify the entire args array to pass it as a single message
         var res = sendMessage('$channelName', JSON.stringify([JSON.stringify(args)]));
         try {
            return JSON.parse(res);
