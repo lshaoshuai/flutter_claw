@@ -6,32 +6,33 @@ library flutter_claw;
 // ============================================================================
 
 // 导出数据模型 (外部需要用这些类来构造请求和接收结果)
-export 'src/models/task_config.dart';
-export 'src/models/execution_result.dart';
-export 'src/models/message.dart';
+export 'models/task_config.dart';
+export 'models/execution_result.dart';
+export 'models/message.dart';
 
 // 导出 Agent 核心 (允许高阶用户自己继承基类手搓 Agent)
-export 'src/agents/base_agent.dart';
-export 'src/agents/manager_agent.dart';
-export 'src/agents/worker_agent.dart';
+export 'agents/base_agent.dart';
+export 'agents/manager_agent.dart';
+export 'agents/worker_agent.dart';
 
 // 导出底层控制 (允许外部注册自定义的 Dart 函数给 JS 引擎调用)
-export 'src/bridge/bridge_registry.dart';
-export 'src/sandbox/js_runtime.dart';
+export 'bridge/bridge_registry.dart';
+export 'sandbox/js_runtime.dart';
 
 // 导出 LLM 接口 (允许外部传入不同的模型提供商)
-export 'src/llm/llm_client.dart';
-export 'src/llm/gemini_provider.dart';
+export 'llm/llm_client.dart';
+export 'llm/gemini_provider.dart';
 
 
 // ============================================================================
 // 2. 核心门面类 (Facade) - 提供极简的初始化和调用入口
 // ============================================================================
 
-import 'src/agents/manager_agent.dart';
-import 'src/sandbox/js_runtime.dart';
-import 'src/llm/llm_client.dart';
-import 'src/bridge/bridge_registry.dart';
+import 'models/execution_result.dart';
+import 'agents/manager_agent.dart';
+import 'sandbox/js_runtime.dart';
+import 'llm/llm_client.dart';
+import 'bridge/bridge_registry.dart';
 
 class FlutterClaw {
   // 单例模式，确保整个 App 只有一个全局的 Agent OS 调度中心

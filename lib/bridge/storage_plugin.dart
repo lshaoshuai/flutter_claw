@@ -18,6 +18,7 @@ class StoragePlugin extends ClawBridgePlugin {
     'write': _writeFile,
     'delete': _deleteFile,
     'list': _listFiles,
+    'getResult': _getResult, // 将获取结果的方法暴露出去
   };
 
   /// JS 端调用: const content = Claw.vfs_read('data.csv');
@@ -146,13 +147,4 @@ class StoragePlugin extends ClawBridgePlugin {
     }
     return resultStr;
   }
-
-  @override
-  Map<String, dynamic Function(List<dynamic>)> get methods => {
-    'read': _readFile,
-    'write': _writeFile,
-    'delete': _deleteFile,
-    'list': _listFiles,
-    'getResult': _getResult, // 将获取结果的方法暴露出去
-  };
 }
