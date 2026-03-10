@@ -38,9 +38,16 @@ class ManagerAgent {
       try {
         // 请求 LLM 生成 JS 代码
         final llmResponse = await llmClient.chat(conversation);
-        final jsCode = _extractJSCode(llmResponse);
+        print('原始响应: \n$llmResponse');
 
-        if (jsCode.isEmpty) {
+        // 提取并清洗代码
+        final rawJsCode = _extractJSCode(llmResponse);
+        print('提取出的代码: \n[[$rawJsCode]]');
+
+        final cleanJsCode = _sanitizeJsCode(rawJsCode);
+        print('最终执行代码: \n[[$cleanJsCode]]');
+
+        if (cleanJsCode.isEmpty) {
           return ExecutionResult.error(
             'Agent 未能生成有效的 JavaScript 代码。响应: $llmResponse',
           );
@@ -49,29 +56,35 @@ class ManagerAgent {
         print('📦 代码生成完毕，准备推入 Edge Sandbox 执行...');
 
         // 执行代码
-        final result = await jsRuntime.evaluate(jsCode);
+        final result = await jsRuntime.evaluate(cleanJsCode);
 
         // 如果执行成功，直接返回结果，跳出循环
         if (result.isSuccess) {
           print('✅ 代码执行成功！');
-          // 可选：将最终的 stdout 再次发给 LLM，让它总结成人类可读的话术
-          // 这里为了极致节省 Token，直接返回沙盒结果
           return result;
         } else {
           // ⚠️ 执行失败，捕获报错信息，准备让 LLM Debug
           print('❌ 执行报错: ${result.stderr}');
 
+          // 构建针对性的报错提示
+          String errorFeedback = '你的代码报错了，请修复。错误日志如下:\n${result.stderr}\n';
+
+          // 如果是全角字符报错，给予强烈警告
+          if (result.stderr.contains('Invalid character') ||
+              result.stderr.contains('\uff01')) {
+            errorFeedback +=
+                '⚠️ 注意：检测到非法全角字符！请务必检查并确保所有标点符号（如感叹号、分号、括号、引号等）均为纯英文半角状态！\n';
+          }
+
+          errorFeedback += '请只输出修复后的代码，不要解释。';
+
           // 将报错信息追加到对话历史中，让 LLM 知道它刚才错在哪了
           conversation.add(Message(role: 'assistant', content: llmResponse));
-          conversation.add(
-            Message(
-              role: 'user',
-              content:
-                  '你的代码报错了，请修复。错误日志如下:\n${result.stderr}\n请只输出修复后的代码，不要解释。',
-            ),
-          );
+          conversation.add(Message(role: 'user', content: errorFeedback));
         }
-      } catch (e) {
+      } catch (e, stacktrace) {
+        print('❌ 捕获到未处理异常: $e');
+        print('堆栈轨迹: $stacktrace');
         return ExecutionResult.error('系统严重异常: $e');
       }
     }
@@ -81,7 +94,6 @@ class ManagerAgent {
   }
 
   /// 构建极其严格的沙盒系统提示词 (System Prompt)
-  /// 决定了 Agent 输出代码的质量和安全性
   String _buildSystemPrompt() {
     return '''
 你是一个运行在移动端沙盒中的高级 JavaScript (ES6) 数据分析专家。
@@ -95,8 +107,9 @@ class ManagerAgent {
    - `Claw.httpGet(url)`: 发起 GET 请求，返回字符串。
    - `Claw.readVFS(path)`: 读取本地虚拟文件系统的数据。
 
-【输出规范】
-请始终将你的代码包裹在 markdown 的 js 代码块中，例如：
+【编码规范 - 严禁报错】
+1. 严禁在 JS 代码中使用任何中文全角字符（如：！；，。《》【】（）“”‘’）。所有标点、符号、括号必须使用英文半角。
+2. 请始终将你的代码包裹在 markdown 的 js 代码块中，例如：
 ```javascript
 const data = Claw.readVFS('/data.csv');
 // 处理逻辑...
@@ -106,12 +119,40 @@ Claw.finish(result);
 
   /// 从 LLM 的 Markdown 回复中提取代码块
   String _extractJSCode(String text) {
-    final RegExp codeBlockRegex = RegExp(r'javascript|js)?\n([\s\S]*?)```');
+    // 修正后的正则：
+    // 1. ```(?:javascript|js)? 匹配代码块开头，可选指定语言
+    // 2. \s* 匹配可能的换行
+    // 3. ([\s\S]*?) 捕获组 1：匹配所有内容（包括换行），直到遇到结束的 ```
+    final RegExp codeBlockRegex = RegExp(
+      r'```(?:javascript|js)?\s*([\s\S]*?)```',
+      caseSensitive: false,
+    );
+
     final match = codeBlockRegex.firstMatch(text);
+
     if (match != null && match.groupCount >= 1) {
+      // 返回捕获组中的内容
       return match.group(1)!.trim();
     }
-    // 如果 LLM 不听话没有用 markdown 包裹，尝试直接返回原文
+
+    // 如果没有匹配到 ``` 块，尝试返回原始文本（防止 LLM 只返回了代码而没加 Markdown 标签）
     return text.trim();
+  }
+
+  /// 静态清洗：强行替换常见的中文全角符号，作为沙盒执行前的最后一道防线
+  String _sanitizeJsCode(String code) {
+    if (code.isEmpty) return '';
+
+    return code
+        .replaceAll('！', '!')
+        .replaceAll('；', ';')
+        .replaceAll('，', ',')
+        .replaceAll('：', ':')
+        .replaceAll('（', '(')
+        .replaceAll('）', ')')
+        .replaceAll('“', '"')
+        .replaceAll('”', '"')
+        .replaceAll('‘', "'")
+        .replaceAll('’', "'");
   }
 }

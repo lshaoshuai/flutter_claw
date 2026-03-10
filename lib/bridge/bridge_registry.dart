@@ -24,7 +24,6 @@ class BridgeRegistry {
       // 为了防止命名冲突，将 namespace 和 methodName 结合
       // 最终在 JS 里调用的形式如：Claw_network_get(...) 或直接 Claw.network_get(...)
       final fullMethodName = '${plugin.namespace}_$methodName';
-
       jsRuntime.registerBridgeMethod(fullMethodName, handler);
       print('🔗 注册桥接方法: Claw.$fullMethodName');
     });

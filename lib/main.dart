@@ -6,7 +6,6 @@ import 'agents/manager_agent.dart';
 import 'sandbox/js_runtime.dart';
 import 'bridge/bridge_registry.dart';
 import 'bridge/system_plugin.dart';
-import 'agents/manager_agent.dart';
 import 'llm/llm_client.dart';
 import 'llm/gemini_provider.dart';
 import 'llm/openai_provider.dart';
@@ -60,7 +59,7 @@ class _ConfigPageState extends State<ConfigPage> {
     // 初始化选中的大模型客户端
     LLMClient llmClient;
     if (_selectedModel.contains('Gemini')) {
-      llmClient = GeminiProvider(apiKey: apiKey);
+      llmClient = GeminiProvider(apiKey: apiKey, model: "gemini-3-flash-preview");
     } else {
       llmClient = OpenAIProvider(apiKey: apiKey);
     }
