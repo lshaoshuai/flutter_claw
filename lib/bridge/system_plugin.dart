@@ -20,10 +20,38 @@ class SystemPlugin extends ClawBridgePlugin {
   /// Triggers a short device vibration
   dynamic _vibrate(List<dynamic> args) {
     try {
-      HapticFeedback.vibrate();
-      return '{"status": "success"}';
+      int level = 1; // 默认兴奋度
+      if (args.isNotEmpty) {
+        level = int.tryParse(args[0].toString()) ?? 1;
+      }
+
+      // 限制在 1-10 之间，防止大模型乱传数字导致手机无限震动
+      level = level.clamp(1, 10);
+
+      print('📳 [SystemPlugin] 触发震动，当前兴奋度: $level');
+
+      // 异步执行震动序列，不阻塞主线程
+      _playVibrationPattern(level);
+
+      return '{"status": "success", "level": $level}';
     } catch (e) {
-      return '{"status": "error", "message": "Vibration not supported or failed: $e"}';
+      return '{"status": "error", "message": "Vibration failed: $e"}';
+    }
+  }
+
+  /// 根据兴奋度动态计算震动频率和次数
+  Future<void> _playVibrationPattern(int level) async {
+    // 兴奋度越高，震动次数越多 (1~10次)
+    int count = level;
+
+    // 兴奋度越高，每次震动的间隔越短，显得越急促 (最高频间隔约 50ms，最低频约 300ms)
+    int delayMs = 350 - (level * 30);
+    if (delayMs < 50) delayMs = 50;
+
+    for (int i = 0; i < count; i++) {
+      // heavyImpact 震感比较明显
+      HapticFeedback.heavyImpact();
+      await Future.delayed(Duration(milliseconds: delayMs));
     }
   }
 

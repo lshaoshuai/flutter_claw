@@ -1,3 +1,7 @@
+import 'package:flutter_claw/bridge/browser_plugin.dart';
+import 'package:flutter_claw/bridge/tts_plugin.dart';
+import 'package:flutter_claw/bridge/ui_plugin.dart';
+
 import '../sandbox/js_runtime.dart';
 import '../models/task_config.dart';
 import '../utils/logger.dart';
@@ -41,6 +45,13 @@ class BridgeRegistry {
       registerPlugin(StoragePlugin());
     }
 
+    if (config.requireBrowser) {
+      registerPlugin(BrowserPlugin());
+    }
+
+    if (config.requireTts) {
+      registerPlugin(TTSPlugin());
+    }
     // Always register basic system info if needed
     // registerPlugin(SystemPlugin());
   }

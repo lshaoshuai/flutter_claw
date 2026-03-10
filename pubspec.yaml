@@ -37,6 +37,7 @@ dependencies:
   flutter_js: ^0.8.7
   path_provider: ^2.1.5
   logger: ^2.6.2
+  flutter_tts: ^4.2.5
 
 dev_dependencies:
   flutter_test:
@@ -48,6 +49,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  json_serializable: ^6.13.0
+  build_runner: ^2.12.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

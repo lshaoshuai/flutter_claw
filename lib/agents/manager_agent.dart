@@ -29,7 +29,7 @@ class ManagerAgent {
 
     // 1. Initialize conversation history (injecting the System Prompt)
     List<Message> conversation = [
-      Message(role: 'system', content: _buildSystemPrompt()),
+      Message(role: 'system', content: buildSystemPrompt()),
       Message(role: 'user', content: instruction),
     ];
 
@@ -107,7 +107,7 @@ class ManagerAgent {
   }
 
   /// Constructs a strictly enforced Sandbox System Prompt
-  String _buildSystemPrompt() {
+  String buildSystemPrompt() {
     return '''
 You are an advanced JavaScript (ES6) Data Analysis Expert running in a mobile sandbox environment.
 Your task is to translate natural language user requirements into JS code and execute them automatically.
