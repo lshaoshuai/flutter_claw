@@ -19,11 +19,15 @@ class ManagerAgent {
     required this.llmClient,
     required this.jsRuntime,
     TaskConfig? defaultConfig,
-  }) : defaultConfig = defaultConfig ?? TaskConfig(taskId: 'default_manager_task');
+  }) : defaultConfig =
+           defaultConfig ?? TaskConfig(taskId: 'default_manager_task');
 
   /// Receives operational instructions and starts the processing flow.
   /// [config] optional task-specific configuration.
-  Future<ExecutionResult> process(String instruction, {TaskConfig? config}) async {
+  Future<ExecutionResult> process(
+    String instruction, {
+    TaskConfig? config,
+  }) async {
     final taskConfig = config ?? defaultConfig;
     Log.i('🧠 ManagerAgent received task [${taskConfig.taskId}]: $instruction');
 
@@ -39,7 +43,9 @@ class ManagerAgent {
     // 2. Start the self-correcting execution loop (The Agent Loop)
     while (attempts <= maxRetries) {
       if (attempts > 0) {
-        Log.i('🔄 Starting retry attempt #$attempts for planning and code generation...');
+        Log.i(
+          '🔄 Starting retry attempt #$attempts for planning and code generation...',
+        );
       }
       attempts++;
 
@@ -66,7 +72,10 @@ class ManagerAgent {
         );
 
         // Execute code
-        final result = await jsRuntime.evaluate(cleanJsCode, timeout: taskConfig.timeout);
+        final result = await jsRuntime.evaluate(
+          cleanJsCode,
+          timeout: taskConfig.timeout,
+        );
 
         // If execution is successful, return the result directly and break the loop
         if (result.isSuccess) {
@@ -133,19 +142,35 @@ Claw.finish(result);
 
   /// Extracts the code block from the LLM's Markdown response
   String _extractJSCode(String text) {
-    // Regex logic:
-    // 1. Matches the start of a markdown code block ``` optionally followed by js/javascript
-    // 2. Captures all content until the closing ```
+    String cleaned = text.trim();
+
+    // 1. Regex logic: Try to extract from Markdown code blocks
+    // Using non-capturing group for language identifier to focus on content
     final RegExp codeBlockRegex = RegExp(
       r'```(?:javascript|js)?\s*([\s\S]*?)```',
       caseSensitive: false,
     );
-    final match = codeBlockRegex.firstMatch(text);
+    final allMatches = codeBlockRegex.allMatches(cleaned);
 
-    if (match != null && match.groupCount >= 1) {
-      return match.group(1)!.trim();
+    if (allMatches.isNotEmpty) {
+      // 🌟 IMPROVEMENT: If multiple blocks exist, we usually want the last one
+      // (often the thinking/planning comes first, or a corrected version later)
+      return allMatches.last.group(1)!.trim();
     }
-    return text.trim();
+
+    // 2. 🌟 ULTIMATE FALLBACK: Slice off stray "javascript" or "js" prefixes
+    // This catches cases where the LLM didn't use backticks,
+    // or put a newline before the language tag causing the regex to miss it.
+    final lowerCleaned = cleaned.toLowerCase();
+    if (lowerCleaned.startsWith('javascript')) {
+      return cleaned.substring(10).trim();
+    } else if (lowerCleaned.startsWith('js')) {
+      return cleaned.substring(2).trim();
+    }
+
+    // 3. FINAL FALLBACK: If nothing else works, return the trimmed text itself
+    // This handles raw code output without any markdown or prefixes.
+    return cleaned;
   }
 
   /// Static Cleaning: Forcefully replace common full-width symbols as a last line of defense

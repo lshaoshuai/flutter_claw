@@ -210,14 +210,21 @@ class _ClawAvatarState extends State<ClawAvatar> with SingleTickerProviderStateM
   }
 }
 
-// 眼睛组件保持不变
+// ============================================================================
+// 🌟 1. 极致生动的眼睛组件 (加入瞳孔高光反射)
+// ============================================================================
 class _AnimatedEye extends StatelessWidget {
   final double width;
   final double height;
   final double radius;
   final Color color;
 
-  const _AnimatedEye({required this.width, required this.height, required this.radius, required this.color});
+  const _AnimatedEye({
+    required this.width,
+    required this.height,
+    required this.radius,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -230,76 +237,138 @@ class _AnimatedEye extends StatelessWidget {
         color: color,
         borderRadius: BorderRadius.circular(math.max(0.1, radius)),
         boxShadow: [
-          BoxShadow(color: color.withOpacity(0.6), blurRadius: 15, spreadRadius: 2),
+          BoxShadow(
+            color: color.withOpacity(0.6),
+            blurRadius: 15,
+            spreadRadius: 2,
+          ),
         ],
+      ),
+      // 🌟 新增：利用 ClipRRect 切割出眼球内部的高光反射！
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(math.max(0.1, radius)),
+        child: Align(
+          alignment: const Alignment(0.3, -0.6), // 高光永远固定在右上方
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            // 高光的大小会随着眼睛的整体大小等比例缩放
+            width: width * 0.35,
+            height: height * 0.25,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.5), // 半透明白色模拟玻璃反光
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
-// 🌟 新增：基于贝塞尔曲线的参数化嘴巴
+// ============================================================================
+// 🌟 2. 参数化嘴巴包裹器
+// ============================================================================
 class _AnimatedMouth extends StatelessWidget {
-  final double smile; // -1.0 到 1.0
-  final double open;  // 0.0 到 1.0 (说话时的张开度)
+  final double smile; // -1.0(悲伤) 到 1.0(大笑)
+  final double open;  // 0.0(闭嘴) 到 1.0(张大嘴)
   final Color color;
 
-  const _AnimatedMouth({required this.smile, required this.open, required this.color});
+  const _AnimatedMouth({
+    required this.smile,
+    required this.open,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // 使用 TweenAnimationBuilder 让嘴巴形变变得丝滑
+    // 使得从“大笑”恢复到“平静”时的曲线过渡极其丝滑
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: smile, end: smile),
-      duration: const Duration(milliseconds: 250),
+      duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
       builder: (context, currentSmile, child) {
         return CustomPaint(
           size: const Size(60, 20), // 嘴巴的物理画板大小
-          painter: _MouthPainter(smile: currentSmile, open: open, color: color),
+          painter: _MouthPainter(
+            smile: currentSmile,
+            open: open,
+            color: color,
+          ),
         );
       },
     );
   }
 }
 
+// ============================================================================
+// 🌟 3. 双贝塞尔曲线真实口型渲染引擎
+// ============================================================================
 class _MouthPainter extends CustomPainter {
   final double smile;
   final double open;
   final Color color;
 
-  _MouthPainter({required this.smile, required this.open, required this.color});
+  _MouthPainter({
+    required this.smile,
+    required this.open,
+    required this.color,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+    final double cy = size.height / 2;
+
+    // --- 核心数学逻辑 ---
+
+    // 1. 计算嘴角的 Y 坐标 (受 smile 影响)
+    // 如果 smile=1 (笑)，嘴角上扬 (Y变小)；如果 smile=-1 (悲伤)，嘴角下垂 (Y变大)
+    final double cornerY = cy - (smile * 8.0);
+
+    // 2. 计算嘴唇中心的基准 Y 坐标
+    // 如果是笑脸，嘴巴中心会往下压，配合上扬的嘴角形成 U 型
+    final double baseCenterY = cy + (smile * 8.0);
+
+    // 3. 计算上嘴唇和下嘴唇的控制点 (受说话张嘴张力 open 影响)
+    // 说话时，上嘴唇微抬，下嘴唇大幅度向下拉伸
+    final double upperCy = baseCenterY - (open * 4.0);
+    final double lowerCy = baseCenterY + (open * 18.0);
+
+    // --- 绘制路径 ---
+    final path = Path();
+    path.moveTo(0, cornerY); // 左嘴角
+
+    // 画上嘴唇曲线 (向右)
+    path.quadraticBezierTo(size.width / 2, upperCy, size.width, cornerY);
+
+    // 画下嘴唇曲线 (向左画回去，形成闭合口型)
+    path.quadraticBezierTo(size.width / 2, lowerCy, 0, cornerY);
+    path.close();
+
+    // --- 画笔配置 ---
+    // 描边画笔：保证无论是否张嘴，嘴巴都有一条发光的轮廓线
+    final strokePaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.0
+      ..strokeWidth = 3.5
       ..strokeCap = StrokeCap.round
-      ..imageFilter = ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2); // 微微的霓虹发光感
+      ..strokeJoin = StrokeJoin.round
+      ..imageFilter = ui.ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5);
 
-    final path = Path();
+    // 填充画笔：张开嘴时，内部有半透明的果冻感发光填充
+    final fillPaint = Paint()
+      ..color = color.withOpacity(open * 0.4) // 张得越大，内部越亮
+      ..style = PaintingStyle.fill;
 
-    // 起点：左边
-    path.moveTo(0, size.height / 2);
-
-    // 🌟 核心算法：用二次贝塞尔曲线拉扯出笑容或悲伤
-    // 控制点在正中间，Y 轴受到 smile 参数控制
-    // 如果 smile=1 (笑)，控制点往下压，形成 U 型；
-    // 如果 smile=-1 (悲伤)，控制点往上顶，形成倒 U 型；
-    // 说话时 (open > 0)，下嘴唇也会跟着向下扩张
-    double controlPointY = (size.height / 2) + (smile * 15) + (open * 10);
-
-    path.quadraticBezierTo(
-        size.width / 2, controlPointY, // 控制点
-        size.width, size.height / 2    // 终点：右边
-    );
-
-    canvas.drawPath(path, paint);
+    // 先画内部填充，再画发光外轮廓
+    canvas.drawPath(path, fillPaint);
+    canvas.drawPath(path, strokePaint);
   }
 
   @override
   bool shouldRepaint(covariant _MouthPainter oldDelegate) {
-    return oldDelegate.smile != smile || oldDelegate.open != open || oldDelegate.color != color;
+    return oldDelegate.smile != smile ||
+        oldDelegate.open != open ||
+        oldDelegate.color != color;
   }
 }
+

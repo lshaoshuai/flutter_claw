@@ -154,7 +154,6 @@ $environmentSnapshot
 $triggerReason
 结合当前的时间和你的性格，决定是否要主动用 TTS 或 Toast 提醒用户。
 ''';
-      Log.i('🧠 触发主动潜意识思考: $hiddenPrompt');
       final result = await _managerAgent.process(hiddenPrompt);
       if (result.isSuccess) {
         _proactiveMsgController.add(result.stdout);
