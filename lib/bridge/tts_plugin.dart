@@ -1,9 +1,11 @@
-import 'dart:io' show Platform; // 🌟 必须引入，用于判断 iOS/Android 避免崩溃
+import 'dart:io' show Platform;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'bridge_registry.dart';
+import '../events/event_bus.dart'; // 🌟 引入事件总线
+import '../utils/logger.dart';     // 顺手把你之前的 print 换成标准日志
 
 /// 文本转语音 (Text-to-Speech) 插件
-/// 赋予 Agent 说话的能力，支持自动识别语言
+/// 赋予 Agent 说话的能力，支持自动识别语言，并联动 UI 表情系统
 class TTSPlugin extends ClawBridgePlugin {
   final FlutterTts flutterTts = FlutterTts();
 
@@ -16,7 +18,28 @@ class TTSPlugin extends ClawBridgePlugin {
     await flutterTts.setSpeechRate(0.5);
     await flutterTts.setPitch(1.2);
 
-    // 🌟 修复之前的 iOS 崩溃报错！严格区分平台 API
+    // 🌟 1. 绑定发声生命周期到事件总线 (联动 ClawAvatar)
+    flutterTts.setStartHandler(() {
+      Log.i('🗣️ [TTSPlugin] 开始播报');
+      EventBus().fire(SpeakingStatusEvent(true)); // 通知脸部：开始动嘴巴/眼睛闪烁
+    });
+
+    flutterTts.setCompletionHandler(() {
+      Log.i('🤐 [TTSPlugin] 播报结束');
+      EventBus().fire(SpeakingStatusEvent(false)); // 通知脸部：恢复平静
+    });
+
+    flutterTts.setCancelHandler(() {
+      Log.w('🛑 [TTSPlugin] 播报被取消');
+      EventBus().fire(SpeakingStatusEvent(false));
+    });
+
+    flutterTts.setErrorHandler((msg) {
+      Log.e('❌ [TTSPlugin] 播报出错: $msg');
+      EventBus().fire(SpeakingStatusEvent(false));
+    });
+
+    // 🌟 2. 平台专属配置初始化
     try {
       if (Platform.isAndroid) {
         // 仅 Android 支持 QueueMode
@@ -33,7 +56,7 @@ class TTSPlugin extends ClawBridgePlugin {
         );
       }
     } catch (e) {
-      print('⚠️ [TTSPlugin] 平台专属配置初始化失败: $e');
+      Log.e('⚠️ [TTSPlugin] 平台专属配置初始化失败: $e');
     }
   }
 
@@ -57,7 +80,7 @@ class TTSPlugin extends ClawBridgePlugin {
         .replaceAll('*', '')
         .replaceAll('#', '');
 
-    // 🌟 异步触发语音播报与语言切换 (不阻塞 JS 执行线程)
+    // 异步触发语音播报与语言切换 (不阻塞 JS 执行线程)
     _speakWithLanguageDetection(safeText);
 
     return '{"status": "success"}';
@@ -67,7 +90,7 @@ class TTSPlugin extends ClawBridgePlugin {
   Future<void> _speakWithLanguageDetection(String text) async {
     // 正则匹配：是否包含中文字符 (CJK 统一表意文字)
     final hasChinese = RegExp(r'[\u4e00-\u9fa5]').hasMatch(text);
-    // 正则匹配：是否包含日文假名 (考虑到你现在的所在地，顺手加个日语检测)
+    // 正则匹配：是否包含日文假名
     final hasJapanese = RegExp(r'[ぁ-んァ-ン]').hasMatch(text);
 
     try {
@@ -80,10 +103,11 @@ class TTSPlugin extends ClawBridgePlugin {
         await flutterTts.setLanguage("en-US");
       }
 
-      // 切换完语言后，开始播报
+      // 切换完语言后，开始播报。由于我们在 init 里设置了 Handler，
+      // 这里调用 speak 后，EventBus 会自动捕获并通知 UI！
       await flutterTts.speak(text);
     } catch (e) {
-      print('❌ [TTSPlugin] 语言切换或播报失败: $e');
+      Log.e('❌ [TTSPlugin] 语言切换或播报失败: $e');
     }
   }
 }

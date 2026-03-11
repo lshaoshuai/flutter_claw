@@ -33,6 +33,35 @@ class ProactiveSpeakEvent extends ClawEvent {
   ProactiveSpeakEvent(this.thoughtContext);
 }
 
+/// 情绪表现事件 (控制眼睛是开心、生气还是悲伤)
+/// 🌟 参数化面部控制事件 (由大模型直接输出参数)
+class FaceExpressionEvent extends ClawEvent {
+  final double eyeWidth;
+  final double eyeHeight;
+  final double eyeRadius;
+  final double spacing;
+  final double tiltAngle;
+  final String colorHex;
+  // 🌟 新增嘴巴参数
+  final double mouthSmile; // 嘴巴弧度: 1.0(大笑), 0.0(平直), -1.0(悲伤下拉)
+
+  FaceExpressionEvent({
+    required this.eyeWidth,
+    required this.eyeHeight,
+    required this.eyeRadius,
+    required this.spacing,
+    required this.tiltAngle,
+    required this.colorHex,
+    required this.mouthSmile,
+  });
+}
+
+// 保留之前的 SpeakingStatusEvent，用于叠加嘴巴/说话动画
+class SpeakingStatusEvent extends ClawEvent {
+  final bool isSpeaking;
+  SpeakingStatusEvent(this.isSpeaking);
+}
+
 // ============================================================================
 // 3. 核心事件总线 (EventBus) - 单例模式 + 广播流
 // ============================================================================

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_claw/llm/openai_provider.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // 🌟 引入 shared_preferences
 
 // 引入你自己的核心库
 import 'package:flutter_claw/flutter_claw.dart';
@@ -21,16 +22,46 @@ class _ConfigPageState extends State<ConfigPage> {
   // 默认选择的模型
   String _selectedModel = 'Gemini';
 
+  // 存储用的 Keys
+  static const String _prefsKeyModel = 'saved_llm_model';
+  static const String _prefsKeyApiKey = 'saved_api_key';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedConfig(); // 🌟 页面启动时，自动读取本地保存的配置
+  }
+
+  /// 🌟 从本地磁盘加载上次的配置
+  Future<void> _loadSavedConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedModel = prefs.getString(_prefsKeyModel);
+    final savedApiKey = prefs.getString(_prefsKeyApiKey);
+
+    // 如果组件还没被销毁，则更新 UI
+    if (mounted) {
+      setState(() {
+        if (savedModel != null && (savedModel == 'Gemini' || savedModel == 'OpenAI')) {
+          _selectedModel = savedModel;
+        }
+        if (savedApiKey != null) {
+          _apiKeyController.text = savedApiKey;
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     _apiKeyController.dispose();
     super.dispose();
   }
 
-  void _startChat() {
+  /// 🌟 注意这里加上了 async，因为保存硬盘是异步操作
+  Future<void> _startChat() async {
     final apiKey = _apiKeyController.text.trim();
 
-    // 1. 校验 API Key (使用 Get.snackbar，无需 context)
+    // 1. 校验 API Key
     if (apiKey.isEmpty) {
       Get.snackbar(
         '⚠️ 缺少凭证',
@@ -43,12 +74,16 @@ class _ConfigPageState extends State<ConfigPage> {
       return;
     }
 
-    // 2. 根据用户的选择，初始化对应的 LLM 客户端
+    // 🌟 2. 校验通过！把当前的模型和 Key 存进硬盘
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKeyModel, _selectedModel);
+    await prefs.setString(_prefsKeyApiKey, apiKey);
+
+    // 3. 根据用户的选择，初始化对应的 LLM 客户端
     LLMClient llmClient;
     if (_selectedModel == 'Gemini') {
       llmClient = GeminiProvider(
         apiKey: apiKey,
-        // 如果你需要用特定的模型版本，可以在 Provider 里配置
       );
     } else {
       llmClient = OpenAIProvider(
@@ -57,10 +92,10 @@ class _ConfigPageState extends State<ConfigPage> {
       );
     }
 
-    // 3. 极其优雅的 GetX 路由跳转，将实例化好的“大脑”传给聊天页
+    // 4. 极其优雅的 GetX 路由跳转
     Get.to(
-      () => ChatPage(llmClient: llmClient),
-      transition: Transition.rightToLeftWithFade, // 加一个炫酷的过场动画
+          () => ChatPage(llmClient: llmClient),
+      transition: Transition.rightToLeftWithFade,
     );
   }
 
@@ -95,6 +130,7 @@ class _ConfigPageState extends State<ConfigPage> {
 
               // 模型选择下拉框
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 value: _selectedModel,
                 decoration: InputDecoration(
                   labelText: 'Select AI Engine',
@@ -106,11 +142,17 @@ class _ConfigPageState extends State<ConfigPage> {
                 items: const [
                   DropdownMenuItem(
                     value: 'Gemini',
-                    child: Text('Google Gemini (Recommended)'),
+                    child: Text(
+                      'Google Gemini (Recommended)',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   DropdownMenuItem(
                     value: 'OpenAI',
-                    child: Text('OpenAI GPT-4o'),
+                    child: Text(
+                      'OpenAI GPT-4o',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
                 onChanged: (val) {

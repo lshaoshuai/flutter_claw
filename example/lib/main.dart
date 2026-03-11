@@ -26,6 +26,11 @@ class ClawExampleApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
+      builder: (context, child) {
+        return Overlay(
+          initialEntries: [OverlayEntry(builder: (_) => child!)],
+        );
+      },
       // 启动后进入 API Key 配置页
       home: const ConfigPage(),
     );

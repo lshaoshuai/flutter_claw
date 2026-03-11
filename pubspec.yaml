@@ -42,6 +42,8 @@ dependencies:
   get: ^5.0.0-release-candidate-9.3.2
   battery_plus: ^7.0.0
   connectivity_plus: ^7.0.0
+  shared_preferences: ^2.5.4
+  geolocator: ^14.0.2
 
 
 dev_dependencies:

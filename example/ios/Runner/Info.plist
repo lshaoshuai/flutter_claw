@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+    <string>Agent 需要获取您的位置，以便提供基于地理位置的智能上下文分析。</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>Agent 需要在后台感知您的位置变化。</string>
 </dict>
 </plist>
