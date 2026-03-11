@@ -15,6 +15,8 @@ class ClawJSRuntime {
   /// call `Claw.finish()` to retrieve the final result.
   Completer<ExecutionResult>? _executionCompleter;
 
+  bool get isInitialized => _runtime != null;
+
   /// Initializes the sandbox environment
   Future<void> initialize() async {
     // Spin up a fresh QuickJS instance

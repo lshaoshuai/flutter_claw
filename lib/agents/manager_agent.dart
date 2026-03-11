@@ -31,7 +31,19 @@ class ManagerAgent {
     final taskConfig = config ?? defaultConfig;
     Log.i('🧠 ManagerAgent received task [${taskConfig.taskId}]: $instruction');
 
-    // 1. Initialize conversation history (injecting the System Prompt)
+    // 1. Check if sandbox is ready
+    if (!jsRuntime.isInitialized) {
+      Log.w('⚠️ Sandbox not initialized. Attempting automatic initialization...');
+      try {
+        await jsRuntime.initialize();
+      } catch (e) {
+        return ExecutionResult.error(
+          'Failed to initialize sandbox automatically: $e',
+        );
+      }
+    }
+
+    // 2. Initialize conversation history (injecting the System Prompt)
     List<Message> conversation = [
       Message(role: 'system', content: buildSystemPrompt()),
       Message(role: 'user', content: instruction),
