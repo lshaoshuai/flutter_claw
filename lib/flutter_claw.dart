@@ -11,6 +11,7 @@ import 'dart:async';
 import 'package:flutter_claw/perception/context_aggregator.dart';
 import 'package:flutter_claw/skills/claw_skill.dart';
 import 'package:flutter_claw/skills/face_skill.dart';
+import 'package:flutter_claw/skills/meme_skill.dart';
 
 import 'agents/manager_agent.dart';
 import 'agents/profiler_agent.dart';
@@ -43,6 +44,7 @@ class FlutterClaw {
   late _CoreAgent _managerAgent;
   late ProfilerAgent _profilerAgent;
   late SkillManager _skillManager;
+  late BridgeRegistry _bridgeRegistry;
 
   bool _isInitialized = false;
   int _messageCount = 0;
@@ -54,6 +56,7 @@ class FlutterClaw {
 
   Stream<String> get onProactiveMessage => _proactiveMsgController.stream;
 
+  /// 1. 极简的启动方法
   /// 1. 极简的启动方法
   Future<void> init({
     required LLMClient llmClient,
@@ -70,19 +73,26 @@ class FlutterClaw {
     _jsRuntime = ClawJSRuntime();
     await _jsRuntime.initialize();
 
-    final registry = BridgeRegistry(_jsRuntime);
-    registry.registerPlugin(SystemPlugin());
-    registry.registerPlugin(UIPlugin());
-    registry.registerPlugin(TTSPlugin());
-    for (var p in extraPlugins) registry.registerPlugin(p);
+    // 🌟 修复：直接给类成员变量 _bridgeRegistry 赋值
+    _bridgeRegistry = BridgeRegistry(_jsRuntime);
+    _bridgeRegistry.registerPlugin(SystemPlugin());
+    _bridgeRegistry.registerPlugin(UIPlugin());
+    _bridgeRegistry.registerPlugin(TTSPlugin());
+    for (var p in extraPlugins) {
+      _bridgeRegistry.registerPlugin(p);
+    }
 
     // 注册核心与扩展技能
     _skillManager = SkillManager();
     _skillManager.registerSkill(SoulSkill());
     _skillManager.registerSkill(MemorySkill());
     _skillManager.registerSkill(FaceSkill());
-    for (var s in extraSkills) _skillManager.registerSkill(s);
-    _skillManager.mountToRegistry(registry);
+    _skillManager.registerSkill(MemeSkill());
+    for (var s in extraSkills) {
+      _skillManager.registerSkill(s);
+    }
+    // 🌟 修复：使用 _bridgeRegistry
+    _skillManager.mountToRegistry(_bridgeRegistry);
 
     // 实例化双大脑
     _profilerAgent = ProfilerAgent(llmClient: llmClient);
@@ -90,6 +100,7 @@ class FlutterClaw {
       llmClient: llmClient,
       jsRuntime: _jsRuntime,
       skillManager: _skillManager,
+      bridgeRegistry: _bridgeRegistry, // 现在这里就有值了
     );
 
     // 激活底层感官神经
@@ -171,13 +182,16 @@ $triggerReason
 }
 
 /// 框架内置的标准系统大脑 (把之前的 _DemoAgent 挪到了这里)
+/// 框架内置的标准系统大脑
 class _CoreAgent extends ManagerAgent {
   final SkillManager skillManager;
+  final BridgeRegistry bridgeRegistry; // 注入 Registry
 
   _CoreAgent({
     required super.llmClient,
     required super.jsRuntime,
     required this.skillManager,
+    required this.bridgeRegistry, // 接收
   });
 
   @override
@@ -186,11 +200,7 @@ class _CoreAgent extends ManagerAgent {
 You are an advanced, emotional AI assistant running in an Edge Sandbox.
 ${UserProfileManager().toPrompt()}
 
-【Native Capabilities (Strict APIs)】
-1. `Claw.finish('text')`
-2. `Claw.sys_vibrate(level)`
-3. `Claw.ui_showToast('text')`
-4. `Claw.tts_speak('text')`
+${bridgeRegistry.generatePluginPrompt()} 
 
 ${skillManager.generateSkillPrompt()}
 
@@ -201,13 +211,10 @@ Parameters you can tweak:
 - "radius": 15 is round, 5 is sharp/angry.
 - "tilt": 0.0 is neutral. Positive (e.g., 0.3) tilts inwards like \\ / (angry). Negative (e.g., -0.3) tilts outwards like / \\ (sad).
 - "color": Hex code (e.g., #FF3333 for angry, #00FFFF for calm, #FFFF00 for happy).
-Example JS execution:
-```javascript
-Claw.skill_setFace('{"width":40,"height":15,"radius":5,"tilt":0.3,"color":"#FF3333","spacing":30}');
-Claw.tts_speak("Are you an idiot?!");
-Claw.finish("Are you an idiot?!");
-```
-    Only output valid JavaScript wrapped in javascript and .
+
+IMPORTANT INSTRUCTION:
+ONLY output valid JavaScript code.
+MUST wrap your code in standard Markdown block like ```javascript and ```.
 ''';
   }
 }

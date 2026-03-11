@@ -68,6 +68,14 @@ class TTSPlugin extends ClawBridgePlugin {
     'speak': _speak,
   };
 
+  // ============================================================================
+  // 🌟 核心优化：向 LLM 声明 API 签名，并强调其多语言和口语化特性
+  // ============================================================================
+  @override
+  List<String> get jsSignatures => [
+    'Claw.tts_speak(text: String) -> Returns JSON string {"status": "success"} // 调用扬声器用语音读出文本内容。自带中、日、英语言自动识别。请确保传入的文本尽量口语化，避免包含复杂的 Markdown 代码或生僻符号。'
+  ];
+
   /// JS 端同步调用: Claw.tts_speak('你好 / Hello')
   dynamic _speak(List<dynamic> args) {
     if (args.isEmpty) return '{"error": "Missing text parameter"}';

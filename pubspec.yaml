@@ -44,6 +44,9 @@ dependencies:
   connectivity_plus: ^7.0.0
   shared_preferences: ^2.5.4
   geolocator: ^14.0.2
+  speech_to_text: ^7.3.0
+  http: ^1.6.0
+  flutter_dynamic_icon_plus: ^1.4.0
 
 
 dev_dependencies:

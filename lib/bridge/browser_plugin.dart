@@ -12,6 +12,14 @@ class BrowserPlugin extends ClawBridgePlugin {
     'openUrl': _openUrl,
   };
 
+  // ============================================================================
+  // 🌟 核心优化：插件自曝能力说明给大模型看
+  // ============================================================================
+  @override
+  List<String> get jsSignatures => [
+    'Claw.browser_openUrl(url: String) -> Returns JSON string {"status": "success"} // 用于在系统默认外部浏览器中打开指定的 URL 链接'
+  ];
+
   /// JS 端调用: Claw.browser_openUrl('https://flutter.dev')
   dynamic _openUrl(List<dynamic> args) {
     if (args.isEmpty) return '{"error": "Missing URL parameter"}';

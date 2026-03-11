@@ -16,7 +16,17 @@ class SystemPlugin extends ClawBridgePlugin {
     'getDeviceInfo': _getDeviceInfo,
   };
 
-  /// JS Side Call: Claw.sys_vibrate()
+  // ============================================================================
+  // 🌟 核心优化：赋予大模型对物理硬件的精确感知和控制说明
+  // ============================================================================
+  @override
+  List<String> get jsSignatures => [
+    'Claw.sys_vibrate(level: Number) -> Returns JSON string {"status": "success", "level": 1} // 触发手机物理震动反馈。level 取值 1 到 10，代表你的情绪激动程度。数字越大，震动越急促且次数越多（例如极度愤怒或极度兴奋时传 10）。',
+    'Claw.sys_copyToClipboard(text: String) -> Returns JSON string {"status": "success"} // 默默将重要文本（如代码片段、提纲、链接等）复制到用户的手机剪贴板，方便用户直接粘贴使用。',
+    'Claw.sys_getDeviceInfo() -> Returns JSON string // 获取当前系统运行环境的底层软硬件信息。'
+  ];
+
+  /// JS Side Call: Claw.sys_vibrate(5)
   /// Triggers a short device vibration
   dynamic _vibrate(List<dynamic> args) {
     try {
@@ -28,7 +38,7 @@ class SystemPlugin extends ClawBridgePlugin {
       // 限制在 1-10 之间，防止大模型乱传数字导致手机无限震动
       level = level.clamp(1, 10);
 
-      print('📳 [SystemPlugin] 触发震动，当前兴奋度: $level');
+      Log.i('📳 [SystemPlugin] 触发震动，当前情绪激动度: $level');
 
       // 异步执行震动序列，不阻塞主线程
       _playVibrationPattern(level);
@@ -41,15 +51,15 @@ class SystemPlugin extends ClawBridgePlugin {
 
   /// 根据兴奋度动态计算震动频率和次数
   Future<void> _playVibrationPattern(int level) async {
-    // 兴奋度越高，震动次数越多 (1~10次)
+    // 情绪越激动，震动次数越多 (1~10次)
     int count = level;
 
-    // 兴奋度越高，每次震动的间隔越短，显得越急促 (最高频间隔约 50ms，最低频约 300ms)
+    // 情绪越激动，每次震动的间隔越短，显得越急促 (最高频间隔约 50ms，最低频约 320ms)
     int delayMs = 350 - (level * 30);
     if (delayMs < 50) delayMs = 50;
 
     for (int i = 0; i < count; i++) {
-      // heavyImpact 震感比较明显
+      // heavyImpact 震感比较明显，仿佛心跳或敲击
       HapticFeedback.heavyImpact();
       await Future.delayed(Duration(milliseconds: delayMs));
     }

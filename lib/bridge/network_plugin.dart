@@ -19,6 +19,23 @@ class NetworkPlugin extends ClawBridgePlugin {
     'getResult': _getFetchResult,
   };
 
+  // ============================================================================
+  // 🌟 核心优化：非常详细的自描述，甚至包含 JS 轮询范例，防止大模型写错代码
+  // ============================================================================
+  @override
+  List<String> get jsSignatures => [
+    'Claw.network_fetch(url: String) -> Returns String (taskId) // 发起异步网络请求并立即返回一个 taskId',
+    '''Claw.network_getResult(taskId: String) -> Returns JSON String // 根据 taskId 轮询请求结果。
+// JS 调用范例 (请使用 while 循环轮询):
+// const taskId = Claw.network_fetch("https://api.example.com");
+// let result;
+// while(true) { 
+//   result = JSON.parse(Claw.network_getResult(taskId));
+//   if(result.status !== "pending") break;
+// }
+// return result.body;'''
+  ];
+
   /// JS Side Call: const taskId = Claw.network_fetch('https://api.example.com/data');
   /// This method returns synchronously; it only triggers the request and returns a taskId.
   dynamic _startFetch(List<dynamic> args) {

@@ -33,6 +33,12 @@ class ProactiveSpeakEvent extends ClawEvent {
   ProactiveSpeakEvent(this.thoughtContext);
 }
 
+/// 当主人说话时，传递麦克风捕获的音量级别
+class ListeningLevelEvent extends ClawEvent{
+  final double level;
+  ListeningLevelEvent(this.level);
+}
+
 /// 情绪表现事件 (控制眼睛是开心、生气还是悲伤)
 /// 🌟 参数化面部控制事件 (由大模型直接输出参数)
 class FaceExpressionEvent extends ClawEvent {
@@ -60,6 +66,14 @@ class FaceExpressionEvent extends ClawEvent {
 class SpeakingStatusEvent extends ClawEvent {
   final bool isSpeaking;
   SpeakingStatusEvent(this.isSpeaking);
+}
+
+/// 当 Agent 决定发送表情包时触发
+class SendMemeEvent extends ClawEvent {
+  final String memeUrl;
+  final String emotion;
+
+  SendMemeEvent({required this.memeUrl, required this.emotion});
 }
 
 // ============================================================================

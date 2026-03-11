@@ -7,6 +7,11 @@ import '../sandbox/vfs_manager.dart';
 class StoragePlugin extends ClawBridgePlugin {
   final VFSManager vfsManager;
 
+  // --- Unified Result Polling Cache ---
+  // Caches results of asynchronous VFS operations
+  // Moved to the top for better class structure readability
+  final Map<String, String> _vfsCache = {};
+
   StoragePlugin(this.vfsManager);
 
   @override
@@ -21,12 +26,34 @@ class StoragePlugin extends ClawBridgePlugin {
     'getResult': _getResult, // Expose the method to retrieve task results
   };
 
+  // ============================================================================
+  // 🌟 核心优化：提供极其详尽的 API 签名和 JS 文件读写轮询范例
+  // ============================================================================
+  @override
+  List<String> get jsSignatures => [
+    'Claw.vfs_read(path: String) -> Returns String (taskId) // 异步读取文件内容',
+    'Claw.vfs_write(path: String, content: String) -> Returns String (taskId) // 异步写入文件内容',
+    'Claw.vfs_delete(path: String) -> Returns String (taskId) // 异步删除文件',
+    'Claw.vfs_list() -> Returns String (taskId) // 异步获取当前目录下的所有文件名',
+    '''Claw.vfs_getResult(taskId: String) -> Returns JSON String // 轮询获取 VFS 异步操作的结果。
+// JS 调用范例 (请务必使用 while 循环轮询):
+// const writeTaskId = Claw.vfs_write("test.txt", "Hello Claw!");
+// let writeResult;
+// while(true) { 
+//   writeResult = JSON.parse(Claw.vfs_getResult(writeTaskId));
+//   if(writeResult.status !== "pending") break;
+// }
+//
+// const readTaskId = Claw.vfs_read("test.txt");
+// let readResult;
+// while(true) { 
+//   readResult = JSON.parse(Claw.vfs_getResult(readTaskId));
+//   if(readResult.status !== "pending") break;
+// }
+// return readResult.data;'''
+  ];
+
   /// JS Side Call: const taskId = Claw.vfs_read('data.csv');
-  /// Note: File I/O in Dart is asynchronous. To simplify calls from the JS side,
-  /// we could use a "pseudo-synchronous" or forced-wait mode for small local files.
-  /// However, due to QuickJS bridge constraints, we adopt the same
-  /// "Async Task Assignment + Polling" pattern as NetworkPlugin to ensure
-  /// absolute smoothness of the Flutter main thread.
   dynamic _readFile(List<dynamic> args) {
     if (args.isEmpty) return '{"error": "Missing file path"}';
     final path = args[0].toString();
@@ -125,10 +152,6 @@ class StoragePlugin extends ClawBridgePlugin {
       });
     }
   }
-
-  // --- Unified Result Polling Interface ---
-  // Caches results of asynchronous VFS operations
-  final Map<String, String> _vfsCache = {};
 
   /// JS side polling for results. Used by the LLM to retrieve
   /// actual read/write status through a while loop.

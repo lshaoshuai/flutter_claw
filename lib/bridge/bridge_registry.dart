@@ -16,6 +16,13 @@ abstract class ClawBridgePlugin {
   /// A map of all methods provided by this plugin
   /// Key: Method name called from the JS side, Value: The handling logic in the Dart layer
   Map<String, dynamic Function(List<dynamic>)> get methods;
+
+  // ============================================================================
+  // 🌟 核心优化点 1：自描述能力
+  // ============================================================================
+  /// 向 LLM 暴露的 API 签名与功能说明。
+  /// 默认返回空数组。如果你希望大模型知道并使用这个插件，请重写它。
+  List<String> get jsSignatures => [];
 }
 
 /// Core Bridge Registry
@@ -23,10 +30,18 @@ abstract class ClawBridgePlugin {
 class BridgeRegistry {
   final ClawJSRuntime jsRuntime;
 
+  // 🌟 核心优化点 2：缓存已注册的插件，用于后续一键生成 Prompt
+  final List<ClawBridgePlugin> _registeredPlugins = [];
+
   BridgeRegistry(this.jsRuntime);
 
   /// Registers a single plugin
   void registerPlugin(ClawBridgePlugin plugin) {
+    // 🌟 将插件加入缓存
+    if (!_registeredPlugins.contains(plugin)) {
+      _registeredPlugins.add(plugin);
+    }
+
     plugin.methods.forEach((methodName, handler) {
       // Combines namespace and methodName to prevent naming conflicts.
       // Final JS call format: Claw.network_get(...) or directly Claw.network_get(...)
@@ -37,32 +52,43 @@ class BridgeRegistry {
 
   /// Registers default system-level plugins based on [TaskConfig] authorization
   void registerDefaultPlugins(TaskConfig config) {
-    if (config.requireNetwork) {
-      registerPlugin(NetworkPlugin());
-    }
-
-    if (config.requireStorage) {
-      registerPlugin(StoragePlugin());
-    }
-
-    if (config.requireBrowser) {
-      registerPlugin(BrowserPlugin());
-    }
-
-    if (config.requireTts) {
-      registerPlugin(TTSPlugin());
-    }
-
-    if (config.requireUi) {
-      registerPlugin(UIPlugin());
-    }
+    if (config.requireNetwork) registerPlugin(NetworkPlugin());
+    if (config.requireStorage) registerPlugin(StoragePlugin());
+    if (config.requireBrowser) registerPlugin(BrowserPlugin());
+    if (config.requireTts) registerPlugin(TTSPlugin());
+    if (config.requireUi) registerPlugin(UIPlugin());
     // Always register basic system info if needed
     // registerPlugin(SystemPlugin());
+  }
+
+  // ============================================================================
+  // 🌟 核心优化点 3：自动生成 Native Capabilities 的 Prompt
+  // ============================================================================
+  /// 遍历所有已注册的插件，将其 jsSignatures 拼装成系统提示词
+  String generatePluginPrompt() {
+    final buffer = StringBuffer();
+    buffer.writeln('【Native Capabilities (Strict APIs)】');
+
+    // 沙盒自带的必备系统级回调（所有任务都必须用它收尾）
+    buffer.writeln('1. `Claw.finish(text: String)` // 必须调用此方法来结束执行并向用户返回最终文本');
+
+    int index = 2;
+    for (var plugin in _registeredPlugins) {
+      // ⚠️ 特殊处理：跳过 namespace 为 'skill' 的插件
+      // 因为 Skill 类（虽然继承自 Plugin）有更详细的 JSON Schema 和单独的 Prompt 生成器 (SkillManager)
+      if (plugin.namespace == 'skill') continue;
+
+      for (var sig in plugin.jsSignatures) {
+        buffer.writeln('$index. `$sig`');
+        index++;
+      }
+    }
+    return buffer.toString();
   }
 }
 
 // ============================================================================
-// Examples of pre-set Core Plugins below
+// Examples of pre-set Core Plugins below (加入了 jsSignatures 示例)
 // ============================================================================
 
 /// Network Request Plugin Example
@@ -74,6 +100,12 @@ class NetworkPlugin extends ClawBridgePlugin {
   @override
   Map<String, dynamic Function(List<dynamic>)> get methods => {'get': _httpGet};
 
+  // 🌟 插件自曝能力说明给大模型看
+  @override
+  List<String> get jsSignatures => [
+    'Claw.network_get(url: String) -> Returns JSON string {"status": 200, "data": "..."} // 用于发起网络 HTTP GET 请求'
+  ];
+
   /// JS Side Call: Claw.network_get('https://api.example.com/data')
   dynamic _httpGet(List<dynamic> args) {
     if (args.isEmpty) {
@@ -83,24 +115,12 @@ class NetworkPlugin extends ClawBridgePlugin {
     final url = args[0].toString();
     Log.i('🌐 [Bridge] JS initiating HTTP GET request: $url');
 
-    // Note: For the sake of simplicity in this example, Dio or the http package
-    // are not used for real asynchronous requests.
-    // In a real flutter_claw implementation, you would initiate a real HTTP request here.
-    // Since Dart calls returning to JS need to be synchronous strings (or returned
-    // asynchronously via another message channel), we usually recommend that this
-    // just initiates the request and returns a Task ID for JS to poll or await a callback.
-    //
-    // For a simple synchronous bridge demo, we return some mock data:
     return '{"status": 200, "data": "Mock network response data from $url"}';
   }
 }
 
 /// Storage/Read Plugin Example (integrated with VFS)
 class StoragePlugin extends ClawBridgePlugin {
-  // Assume a vfsManager instance is injected
-  // final VFSManager vfsManager;
-  // StoragePlugin(this.vfsManager);
-
   @override
   String get namespace => 'vfs';
 
@@ -109,13 +129,18 @@ class StoragePlugin extends ClawBridgePlugin {
     'read': _readFile,
   };
 
+  // 🌟 插件自曝能力说明给大模型看
+  @override
+  List<String> get jsSignatures => [
+    'Claw.vfs_read(path: String) -> Returns String // 读取沙盒虚拟文件系统中的文件内容'
+  ];
+
   /// JS Side Call: Claw.vfs_read('data.csv')
   dynamic _readFile(List<dynamic> args) {
     if (args.isEmpty) return '{"error": "Missing file path"}';
     final path = args[0].toString();
     Log.i('📂 [Bridge] JS requesting to read file: $path');
 
-    // In a real implementation, call vfsManager.readFile(path)
     return 'Mock file content, e.g., id,name\n1,Alice\n2,Bob';
   }
 }

@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../events/event_bus.dart';
 
+/// Agent 的视觉具身化组件 (具备环境感知与物理形变能力)
 class ClawAvatar extends StatefulWidget {
   const ClawAvatar({super.key});
 
@@ -18,24 +19,27 @@ class _ClawAvatarState extends State<ClawAvatar> with SingleTickerProviderStateM
   double _eyeRadius = 15.0;
   double _tiltAngle = 0.0;
   double _spacing = 40.0;
-  double _mouthSmile = 0.0; // 新增：嘴巴弧度
+  double _mouthSmile = 0.0; // 嘴巴弧度: 1.0(大笑), 0.0(平直), -1.0(悲伤)
   Color _eyeColor = Colors.cyanAccent;
 
-  // --- 生物特征状态 ---
+  // --- 🌟 生物特征状态 ---
   bool _isSpeaking = false;
   bool _isBlinking = false;
+  double _soundLevel = 0.0; // 当前感知到的主人音量 (决定声波震颤幅度)
 
-  // 🌟 新增：眼球微动偏移量 (模拟真实生命体的扫视)
+  // 眼球微动偏移量 (模拟真实生命体的扫视)
   double _lookOffsetX = 0.0;
   double _lookOffsetY = 0.0;
 
+  // --- 🌟 神经枢纽订阅 ---
   late StreamSubscription _faceSub;
   late StreamSubscription _speakingSub;
+  late StreamSubscription _listeningSub;
 
-  // --- 定时器 ---
+  // --- 🌟 定时器与动画 ---
   late Timer _blinkTimer;
-  late Timer _saccadeTimer; // 控制微动
-  Timer? _emotionResetTimer; // 🌟 情绪回弹定时器
+  late Timer _saccadeTimer;
+  Timer? _emotionResetTimer; // 情绪回弹定时器
 
   late AnimationController _speakAnimController;
 
@@ -43,7 +47,7 @@ class _ClawAvatarState extends State<ClawAvatar> with SingleTickerProviderStateM
   void initState() {
     super.initState();
 
-    // 1. 监听大模型的底层几何参数修改
+    // 1. 监听大模型的底层几何参数修改 (情绪突变)
     _faceSub = EventBus().on<FaceExpressionEvent>().listen((event) {
       if (mounted) {
         setState(() {
@@ -56,13 +60,13 @@ class _ClawAvatarState extends State<ClawAvatar> with SingleTickerProviderStateM
           _eyeColor = _hexToColor(event.colorHex);
         });
 
-        // 🌟 核心：触发极端情绪后，设定 4 秒后自动回落到平静状态！
+        // 触发极端情绪后，设定 4 秒后自动回落到平静状态
         _emotionResetTimer?.cancel();
         _emotionResetTimer = Timer(const Duration(seconds: 4), _resetToNeutral);
       }
     });
 
-    // 2. 监听说话状态
+    // 2. 监听 Agent 自身的说话状态 (嘴巴开合与呼吸感)
     _speakAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 150),
@@ -80,12 +84,22 @@ class _ClawAvatarState extends State<ClawAvatar> with SingleTickerProviderStateM
       }
     });
 
-    // 3. 启动生命体征引擎
+    // 3. 监听主人的说话音量 (听觉物理反馈)
+    _listeningSub = EventBus().on<ListeningLevelEvent>().listen((event) {
+      if (mounted) {
+        setState(() {
+          // 过滤掉微小底噪，放大有效音量，让视觉反馈更明显
+          _soundLevel = event.level > 2.0 ? event.level : 0.0;
+        });
+      }
+    });
+
+    // 4. 启动生命体征引擎
     _startRandomBlinking();
     _startSaccadeEngine();
   }
 
-  /// 🌟 情绪回落基准线 (恢复成高冷的平静状态)
+  /// 情绪回落基准线 (恢复成高冷的平静状态)
   void _resetToNeutral() {
     if (mounted && !_isSpeaking) {
       setState(() {
@@ -100,18 +114,18 @@ class _ClawAvatarState extends State<ClawAvatar> with SingleTickerProviderStateM
     }
   }
 
-  /// 🌟 眼球无意识微动引擎
+  /// 眼球无意识微动引擎 (Saccades)
   void _startSaccadeEngine() {
     final random = math.Random();
     _saccadeTimer = Timer.periodic(const Duration(milliseconds: 2500), (timer) {
-      if (mounted && !_isSpeaking) {
+      if (mounted && !_isSpeaking && _soundLevel == 0) {
         // 偶尔向四周随机看一眼
         if (random.nextDouble() > 0.4) {
           setState(() {
-            _lookOffsetX = (random.nextDouble() - 0.5) * 12; // X轴微动
-            _lookOffsetY = (random.nextDouble() - 0.5) * 6;  // Y轴微动
+            _lookOffsetX = (random.nextDouble() - 0.5) * 12;
+            _lookOffsetY = (random.nextDouble() - 0.5) * 6;
           });
-          // 300毫秒后立刻收回视线，形成“灵动的一瞥”
+          // 300毫秒后立刻收回视线
           Future.delayed(const Duration(milliseconds: 300), () {
             if (mounted) setState(() { _lookOffsetX = 0; _lookOffsetY = 0; });
           });
@@ -120,6 +134,7 @@ class _ClawAvatarState extends State<ClawAvatar> with SingleTickerProviderStateM
     });
   }
 
+  /// 随机眨眼机制
   void _startRandomBlinking() {
     _blinkTimer = Timer(Duration(milliseconds: 2000 + (DateTime.now().millisecond % 4000)), () {
       if (mounted) {
@@ -147,6 +162,7 @@ class _ClawAvatarState extends State<ClawAvatar> with SingleTickerProviderStateM
   void dispose() {
     _faceSub.cancel();
     _speakingSub.cancel();
+    _listeningSub.cancel();
     _blinkTimer.cancel();
     _saccadeTimer.cancel();
     _emotionResetTimer?.cancel();
@@ -157,22 +173,34 @@ class _ClawAvatarState extends State<ClawAvatar> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 140, // 稍微拉高一点，给嘴巴留空间
+      height: 140,
       width: double.infinity,
-      color: Colors.black87,
+      color: Colors.black87, // 极客深邃黑底
       child: Center(
         child: AnimatedBuilder(
           animation: _speakAnimController,
           builder: (context, child) {
+            // --- 🌟 动态形变计算核心 ---
+
+            // Agent 自身说话时的振幅
             double speakingEyeOffset = _isSpeaking ? (_speakAnimController.value * 4.0) : 0.0;
             double speakingMouthOpen = _isSpeaking ? (_speakAnimController.value * 1.0) : 0.0;
 
-            double baseHeight = _isBlinking ? 2.0 : _eyeHeight;
-            double finalHeight = math.max(1.0, _isBlinking ? 2.0 : (baseHeight + speakingEyeOffset));
+            // 监听主人声音时的物理压迫感 (声波越大，眼睛越宽越扁，显得极为专注)
+            double soundDistortionX = _soundLevel * 0.4;
+            double soundDistortionY = _soundLevel * 0.2;
 
-            // 🌟 加入微动偏移量
+            // 叠加所有状态计算最终高宽
+            double baseHeight = _isBlinking ? 2.0 : _eyeHeight;
+            double finalHeight = math.max(1.0, _isBlinking ? 2.0 : (baseHeight + speakingEyeOffset - soundDistortionY));
+            double finalWidth = math.max(10.0, _eyeWidth + soundDistortionX);
+
+            // 如果正在专心听主人说话，锁定视线，停止微动
+            double currentOffsetX = _soundLevel > 0 ? 0.0 : _lookOffsetX;
+            double currentOffsetY = _soundLevel > 0 ? 0.0 : _lookOffsetY;
+
             return AnimatedSlide(
-              offset: Offset(_lookOffsetX / 100, _lookOffsetY / 100),
+              offset: Offset(currentOffsetX / 100, currentOffsetY / 100),
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOutQuad,
               child: Column(
@@ -184,21 +212,35 @@ class _ClawAvatarState extends State<ClawAvatar> with SingleTickerProviderStateM
                     children: [
                       Transform.rotate(
                         angle: _tiltAngle,
-                        child: _AnimatedEye(width: _eyeWidth, height: finalHeight, radius: _eyeRadius, color: _eyeColor),
+                        child: _AnimatedEye(
+                          width: finalWidth,
+                          height: finalHeight,
+                          radius: _eyeRadius,
+                          color: _eyeColor,
+                          soundLevel: _soundLevel, // 传入音量，控制高频光晕闪烁
+                        ),
                       ),
                       AnimatedContainer(duration: const Duration(milliseconds: 300), width: _spacing),
                       Transform.rotate(
                         angle: -_tiltAngle,
-                        child: _AnimatedEye(width: _eyeWidth, height: finalHeight, radius: _eyeRadius, color: _eyeColor),
+                        child: _AnimatedEye(
+                          width: finalWidth,
+                          height: finalHeight,
+                          radius: _eyeRadius,
+                          color: _eyeColor,
+                          soundLevel: _soundLevel,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 20),
-                  // --- 🌟 嘴巴区域 ---
+                  // --- 嘴巴区域 ---
                   _AnimatedMouth(
                     smile: _mouthSmile,
-                    open: speakingMouthOpen,
+                    // 如果正在听主人说话，嘴巴微微张开一条缝隙 (高度拟真)
+                    open: math.max(speakingMouthOpen, _soundLevel > 0 ? 0.15 : 0.0),
                     color: _eyeColor,
+                    soundLevel: _soundLevel,
                   ),
                 ],
               ),
@@ -211,26 +253,33 @@ class _ClawAvatarState extends State<ClawAvatar> with SingleTickerProviderStateM
 }
 
 // ============================================================================
-// 🌟 1. 极致生动的眼睛组件 (加入瞳孔高光反射)
+// 🌟 1. 极致生动的眼睛组件 (加入听觉光晕暴击与高光反射)
 // ============================================================================
 class _AnimatedEye extends StatelessWidget {
   final double width;
   final double height;
   final double radius;
   final Color color;
+  final double soundLevel;
 
   const _AnimatedEye({
     required this.width,
     required this.height,
     required this.radius,
     required this.color,
+    this.soundLevel = 0.0,
   });
 
   @override
   Widget build(BuildContext context) {
+    // 声波直接决定光晕爆发大小
+    double blurRadius = 15.0 + (soundLevel * 1.2);
+    double spreadRadius = 2.0 + (soundLevel * 0.5);
+
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOutCubic,
+      // 🌟 极短的持续时间，完美还原声音的高频震颤感
+      duration: const Duration(milliseconds: 60),
+      curve: Curves.easeOut,
       width: width,
       height: math.max(1.0, height),
       decoration: BoxDecoration(
@@ -238,24 +287,23 @@ class _AnimatedEye extends StatelessWidget {
         borderRadius: BorderRadius.circular(math.max(0.1, radius)),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.6),
-            blurRadius: 15,
-            spreadRadius: 2,
+            color: color.withOpacity(soundLevel > 0 ? 0.9 : 0.6), // 听到声音变极亮
+            blurRadius: blurRadius,
+            spreadRadius: spreadRadius,
           ),
         ],
       ),
-      // 🌟 新增：利用 ClipRRect 切割出眼球内部的高光反射！
+      // 利用 ClipRRect 切割出眼球内部的高光反射
       child: ClipRRect(
         borderRadius: BorderRadius.circular(math.max(0.1, radius)),
         child: Align(
-          alignment: const Alignment(0.3, -0.6), // 高光永远固定在右上方
+          alignment: const Alignment(0.3, -0.6), // 高光固定在右上方
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            // 高光的大小会随着眼睛的整体大小等比例缩放
+            duration: const Duration(milliseconds: 150), // 高光变化相对平缓
             width: width * 0.35,
             height: height * 0.25,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.5), // 半透明白色模拟玻璃反光
+              color: Colors.white.withOpacity(0.5),
               borderRadius: BorderRadius.circular(10),
             ),
           ),
@@ -266,33 +314,35 @@ class _AnimatedEye extends StatelessWidget {
 }
 
 // ============================================================================
-// 🌟 2. 参数化嘴巴包裹器
+// 🌟 2. 参数化嘴巴包裹器 (管理丝滑过渡)
 // ============================================================================
 class _AnimatedMouth extends StatelessWidget {
-  final double smile; // -1.0(悲伤) 到 1.0(大笑)
-  final double open;  // 0.0(闭嘴) 到 1.0(张大嘴)
+  final double smile;
+  final double open;
   final Color color;
+  final double soundLevel;
 
   const _AnimatedMouth({
     required this.smile,
     required this.open,
     required this.color,
+    this.soundLevel = 0.0,
   });
 
   @override
   Widget build(BuildContext context) {
-    // 使得从“大笑”恢复到“平静”时的曲线过渡极其丝滑
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: smile, end: smile),
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
       builder: (context, currentSmile, child) {
         return CustomPaint(
-          size: const Size(60, 20), // 嘴巴的物理画板大小
+          size: const Size(60, 20),
           painter: _MouthPainter(
             smile: currentSmile,
             open: open,
             color: color,
+            soundLevel: soundLevel,
           ),
         );
       },
@@ -307,59 +357,48 @@ class _MouthPainter extends CustomPainter {
   final double smile;
   final double open;
   final Color color;
+  final double soundLevel;
 
   _MouthPainter({
     required this.smile,
     required this.open,
     required this.color,
+    this.soundLevel = 0.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final double cy = size.height / 2;
 
-    // --- 核心数学逻辑 ---
-
-    // 1. 计算嘴角的 Y 坐标 (受 smile 影响)
-    // 如果 smile=1 (笑)，嘴角上扬 (Y变小)；如果 smile=-1 (悲伤)，嘴角下垂 (Y变大)
+    // 嘴角控制
     final double cornerY = cy - (smile * 8.0);
-
-    // 2. 计算嘴唇中心的基准 Y 坐标
-    // 如果是笑脸，嘴巴中心会往下压，配合上扬的嘴角形成 U 型
     final double baseCenterY = cy + (smile * 8.0);
 
-    // 3. 计算上嘴唇和下嘴唇的控制点 (受说话张嘴张力 open 影响)
-    // 说话时，上嘴唇微抬，下嘴唇大幅度向下拉伸
+    // 嘴唇开合张力控制
     final double upperCy = baseCenterY - (open * 4.0);
     final double lowerCy = baseCenterY + (open * 18.0);
 
-    // --- 绘制路径 ---
+    // 绘制曲线路径
     final path = Path();
-    path.moveTo(0, cornerY); // 左嘴角
-
-    // 画上嘴唇曲线 (向右)
+    path.moveTo(0, cornerY);
     path.quadraticBezierTo(size.width / 2, upperCy, size.width, cornerY);
-
-    // 画下嘴唇曲线 (向左画回去，形成闭合口型)
     path.quadraticBezierTo(size.width / 2, lowerCy, 0, cornerY);
     path.close();
 
-    // --- 画笔配置 ---
-    // 描边画笔：保证无论是否张嘴，嘴巴都有一条发光的轮廓线
+    // 听到声音时，嘴巴的外轮廓描边随着声波变粗并发出高光
     final strokePaint = Paint()
-      ..color = color
+      ..color = color.withOpacity(soundLevel > 0 ? 1.0 : 0.8)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
+      ..strokeWidth = 3.5 + (soundLevel * 0.1)
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..imageFilter = ui.ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5);
 
-    // 填充画笔：张开嘴时，内部有半透明的果冻感发光填充
+    // 张开嘴时内部的果冻感发光填充
     final fillPaint = Paint()
-      ..color = color.withOpacity(open * 0.4) // 张得越大，内部越亮
+      ..color = color.withOpacity(math.min(1.0, open * 0.4 + (soundLevel * 0.01)))
       ..style = PaintingStyle.fill;
 
-    // 先画内部填充，再画发光外轮廓
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, strokePaint);
   }
@@ -368,7 +407,7 @@ class _MouthPainter extends CustomPainter {
   bool shouldRepaint(covariant _MouthPainter oldDelegate) {
     return oldDelegate.smile != smile ||
         oldDelegate.open != open ||
-        oldDelegate.color != color;
+        oldDelegate.color != color ||
+        oldDelegate.soundLevel != soundLevel;
   }
 }
-
