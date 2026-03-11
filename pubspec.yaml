@@ -38,6 +38,11 @@ dependencies:
   path_provider: ^2.1.5
   logger: ^2.6.2
   flutter_tts: ^4.2.5
+  json_annotation: ^4.11.0
+  get: ^5.0.0-release-candidate-9.3.2
+  battery_plus: ^7.0.0
+  connectivity_plus: ^7.0.0
+
 
 dev_dependencies:
   flutter_test:

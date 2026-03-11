@@ -52,6 +52,10 @@ class BridgeRegistry {
     if (config.requireTts) {
       registerPlugin(TTSPlugin());
     }
+
+    if (config.requireUi) {
+      registerPlugin(UIPlugin());
+    }
     // Always register basic system info if needed
     // registerPlugin(SystemPlugin());
   }
