@@ -6,6 +6,9 @@ class SoulSkill extends ClawSkill {
   String get skillName => 'SoulControl';
 
   @override
+  String get namespace => 'skill'; // 显式声明命名空间
+
+  @override
   String get description =>
       '用于控制你自身的情绪状态。当对话氛围发生变化时，你可以主动切换你的情绪。';
 

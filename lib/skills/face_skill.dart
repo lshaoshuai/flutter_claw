@@ -7,6 +7,9 @@ class FaceSkill extends ClawSkill {
   String get skillName => 'FaceControl';
 
   @override
+  String get namespace => 'skill'; // 显式声明命名空间，确保生成 Claw.skill_setFace
+
+  @override
   String get description =>
       '用于极其细腻地控制你自己的面部表情参数。通过调整眼睛的宽、高、倾斜角和颜色来表达情绪。'
       '正倾斜角(如 0.3)显得生气犀利，负倾斜角(如 -0.3)显得悲伤无辜。';

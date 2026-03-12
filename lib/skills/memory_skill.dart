@@ -6,6 +6,9 @@ class MemorySkill extends ClawSkill {
   String get skillName => 'MemoryControl';
 
   @override
+  String get namespace => 'skill'; // 显式声明命名空间
+
+  @override
   String get description =>
       '用于管理长期记忆和亲密度。当用户告诉你重要个人信息时必须调用 remember。当用户夸奖你时，调用 changeIntimacy 增加好感。';
 

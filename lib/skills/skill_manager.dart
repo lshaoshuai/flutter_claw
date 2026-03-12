@@ -1,4 +1,5 @@
 import '../bridge/bridge_registry.dart';
+import '../utils/logger.dart';
 import 'claw_skill.dart';
 
 class SkillManager {
@@ -13,6 +14,7 @@ class SkillManager {
   void mountToRegistry(BridgeRegistry registry) {
     for (var skill in _skills) {
       registry.registerPlugin(skill);
+      Log.i('🛠️ [SkillManager] 已将技能 "${skill.skillName}" 挂载到沙盒中');
     }
   }
 

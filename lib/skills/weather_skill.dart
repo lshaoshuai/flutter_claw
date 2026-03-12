@@ -8,10 +8,14 @@ class WeatherSkill extends ClawSkill {
   String get skillName => 'WeatherQuery';
 
   @override
+  String get namespace => 'skill'; // 显式声明命名空间，确保生成 Claw.skill_setFace
+
+  @override
   String get description => '获取指定城市的当前真实天气情况。当用户询问天气、气温时必须调用此技能。';
 
   @override
-  String get jsSignature => 'Claw.skill_getWeather(cityName) // 参数: 城市名称(英文或拼音), 返回值: 包含天气的 JSON 字符串';
+  String get jsSignature =>
+      'Claw.skill_getWeather(cityName) // 参数: 城市名称(英文或拼音), 返回值: 包含天气的 JSON 字符串';
 
   @override
   Map<String, dynamic Function(List<dynamic>)> get methods => {
@@ -31,7 +35,7 @@ class WeatherSkill extends ClawSkill {
       'city': city,
       'temperature': 24,
       'condition': 'Sunny',
-      'advice': '天气不错，适合出门逛街。'
+      'advice': '天气不错，适合出门逛街。',
     };
 
     return jsonEncode(mockData);

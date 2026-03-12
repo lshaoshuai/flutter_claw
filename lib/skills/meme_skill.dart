@@ -1,11 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_claw/events/event_bus.dart'; // 请确保路径正确
+import '../utils/logger.dart';
 import 'claw_skill.dart';
 
 class MemeSkill extends ClawSkill {
   @override
   String get skillName => 'MemeSender';
+
+  @override
+  String get namespace => 'skill'; // 显式声明命名空间，确保生成 Claw.skill_searchAndSendMeme
 
   @override
   String get description =>
@@ -40,7 +44,7 @@ class MemeSkill extends ClawSkill {
   // 🌟 修复 3：把真正耗时的网络逻辑抽离成独立的异步方法
   Future<void> _fetchAndFireMeme(String keyword) async {
     // Giphy 免费公共测试 Key (准备商用时去申请自己的)
-    const apiKey = 'dc6zaTOxFJmzC';
+    const apiKey = '';
     final url = Uri.parse('https://api.giphy.com/v1/gifs/search?api_key=$apiKey&q=${Uri.encodeComponent(keyword)}&limit=1&rating=pg-13');
 
     try {
@@ -56,14 +60,15 @@ class MemeSkill extends ClawSkill {
 
           // 🔥 突破沙盒，直接打入 Flutter UI 渲染总线
           EventBus().fire(SendMemeEvent(memeUrl: gifUrl, emotion: keyword));
+          Log.i('✅ [MemeSkill] 已成功搜索并发送表情包: $gifUrl');
         } else {
-          print('⚠️ [MemeSkill] 未搜到关于 [$keyword] 的动图');
+          Log.w('⚠️ [MemeSkill] 未搜到关于 [$keyword] 的动图');
         }
       } else {
-        print('⚠️ [MemeSkill] Giphy 服务器异常，状态码 ${response.statusCode}');
+        Log.e('⚠️ [MemeSkill] Giphy 服务器异常，状态码 ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ [MemeSkill] 网络请求失败: $e');
+      Log.e('❌ [MemeSkill] 网络请求失败: $e');
     }
   }
 }
