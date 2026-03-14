@@ -1,12 +1,14 @@
-import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_claw/utils/logger.dart';
 import 'package:flutter_claw/bridge/bridge_registry.dart';
 
-/// UI 交互插件 (GetX 专属版本)
-/// 允许 Agent 直接操控手机屏幕上的 UI 元素，实现“突破对话框”的交互体验。
+class ClawUI {
+  static GlobalKey<NavigatorState>? navigatorKey;
+  static GlobalKey<ScaffoldMessengerState>? scaffoldMessengerKey;
+}
+
+/// UI 交互插件 (原生 Flutter 纯净版)
 class UIPlugin extends ClawBridgePlugin {
-  // 无需传入任何 GlobalKey 或 Context！
   UIPlugin();
 
   @override
@@ -18,13 +20,10 @@ class UIPlugin extends ClawBridgePlugin {
     'showDialog': _showDialog,
   };
 
-  // ============================================================================
-  // 🌟 核心优化：向大模型精确描述 UI 组件的使用场景，防止滥用
-  // ============================================================================
   @override
   List<String> get jsSignatures => [
-    'Claw.ui_showToast(message: String) -> Returns JSON string {"status": "success"} // 在屏幕底部弹出一个轻量级的短暂提示框 (Snackbar)。适用于非阻塞的轻微通知（如：“后台任务已完成”、“已复制到剪贴板”）。',
-    'Claw.ui_showDialog(title: String, message: String) -> Returns JSON string {"status": "success"} // 在屏幕中央强制弹出一个模态对话框。仅在发生极其重要、必须打断用户操作的严重警告时使用（如：“系统即将崩溃”、“检测到非法入侵”）。不要滥用！'
+    'Claw.ui_showToast(message: String) -> Returns JSON string {"status": "success"} // 在屏幕底部弹出一个轻量级的短暂提示框 (Snackbar)。适用于非阻塞的轻微通知。',
+    'Claw.ui_showDialog(title: String, message: String) -> Returns JSON string {"status": "success"} // 在屏幕中央强制弹出一个模态对话框。仅在发生极其重要、必须打断用户操作的严重警告时使用。不要滥用！'
   ];
 
   /// JS 端调用: Claw.ui_showToast('我是一条提示')
@@ -32,18 +31,23 @@ class UIPlugin extends ClawBridgePlugin {
     if (args.isEmpty) return '{"error": "Missing message parameter"}';
     final message = args[0].toString();
 
-    // 🌟 直接调用 Get.snackbar，不需要 context！
-    Get.snackbar(
-      '🤖 Agent 提示',
-      message,
-      snackPosition: SnackPosition.bottom,
-      backgroundColor: Colors.deepPurpleAccent.withOpacity(0.9),
-      colorText: Colors.white,
-      margin: const EdgeInsets.all(16),
-      duration: const Duration(seconds: 2),
+    final messenger = ClawUI.scaffoldMessengerKey?.currentState;
+    if (messenger == null) {
+      Log.e('❌ [UIPlugin] 无法显示 Toast：宿主 App 未注入 scaffoldMessengerKey');
+      return '{"error": "UI keys not configured"}';
+    }
+
+    // 🌟 使用原生 ScaffoldMessenger
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.deepPurpleAccent.withOpacity(0.9),
+        duration: const Duration(seconds: 2),
+      ),
     );
 
-    Log.i('📱 [UIPlugin] Agent 触发了 Snackbar: $message');
+    Log.i('📱 [UIPlugin] Agent 触发了原生 Snackbar: $message');
     return '{"status": "success"}';
   }
 
@@ -53,18 +57,31 @@ class UIPlugin extends ClawBridgePlugin {
     final title = args[0].toString();
     final message = args[1].toString();
 
-    // 🌟 直接调用 Get.defaultDialog 弹窗
-    Get.defaultDialog(
-      title: title,
-      middleText: message,
-      titleStyle: const TextStyle(fontWeight: FontWeight.bold),
-      confirmTextColor: Colors.white,
-      buttonColor: Colors.deepPurpleAccent,
-      textConfirm: '知道了',
-      onConfirm: () => Get.back(), // 关闭弹窗
+    final context = ClawUI.navigatorKey?.currentContext;
+    if (context == null) {
+      Log.e('❌ [UIPlugin] 无法显示 Dialog：宿主 App 未注入 navigatorKey 或界面尚未渲染');
+      return '{"error": "UI keys not configured"}';
+    }
+
+    // 🌟 使用原生 showDialog
+    showDialog(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          content: Text(message),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.deepPurpleAccent),
+              onPressed: () => Navigator.of(ctx).pop(), // 关闭弹窗
+              child: const Text('知道了'),
+            ),
+          ],
+        );
+      },
     );
 
-    Log.i('📱 [UIPlugin] Agent 强制弹出了 Dialog: $title');
+    Log.i('📱 [UIPlugin] Agent 强制弹出了原生 Dialog: $title');
     return '{"status": "success"}';
   }
 }
