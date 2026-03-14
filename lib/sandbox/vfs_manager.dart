@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:path/path.dart' as p;
+import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Virtual File System (VFS) Manager
@@ -14,7 +14,7 @@ class VFSManager {
   /// [workspaceName] can be dynamically specified based on a Task ID to achieve multi-task isolation.
   Future<void> initialize({String workspaceName = 'agent_workspace'}) async {
     final appDocDir = await getApplicationDocumentsDirectory();
-    _workspaceDir = Directory(p.join(appDocDir.path, workspaceName));
+    _workspaceDir = Directory(join(appDocDir.path, workspaceName));
 
     if (!await _workspaceDir.exists()) {
       await _workspaceDir.create(recursive: true);
@@ -29,15 +29,15 @@ class VFSManager {
     if (!_isInitialized) throw Exception('VFS not initialized');
 
     // Clean illegal characters in the path (e.g., merging multiple '/', resolving '..')
-    final normalizedPath = p.normalize(relativePath);
+    final normalizedPath = normalize(relativePath);
 
     // Concatenate into a full absolute path for the mobile device
-    final absolutePath = p.join(_workspaceDir.path, normalizedPath);
+    final absolutePath = join(_workspaceDir.path, normalizedPath);
 
     // ⚠️ CRITICAL SECURITY CHECK ⚠️
     // Confirm that the final resolved path remains inside the assigned workspace.
     // If an Agent attempts to read "/data/user/0/com.app/databases/user.db", 'isWithin' will return false.
-    if (!p.isWithin(_workspaceDir.path, absolutePath)) {
+    if (!isWithin(_workspaceDir.path, absolutePath)) {
       throw Exception('Security Interception: Denied illegal path traversal access -> $relativePath');
     }
 
@@ -88,7 +88,7 @@ class VFSManager {
       if (entity is File) {
         // For security reasons, only return paths relative to the workspace to the Agent.
         // Never let the Agent know its actual absolute path on the host machine.
-        files.add(p.relative(entity.path, from: _workspaceDir.path));
+        files.add(relative(entity.path, from: _workspaceDir.path));
       }
     }
     return files;
