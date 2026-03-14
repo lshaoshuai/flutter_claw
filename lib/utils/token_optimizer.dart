@@ -68,7 +68,7 @@ $historyText
 
     try {
       final summary = await fastClient.chat([Message.user(prompt)]);
-      print('✅ [TokenOptimizer] Compression complete. Summary: $summary');
+      Log.i('✅ [TokenOptimizer] Compression complete. Summary: $summary');
 
       // Return the summarized content as an assistant memory entry
       return Message(
@@ -76,7 +76,7 @@ $historyText
           content: '[System-injected History Summary] $summary'
       );
     } catch (e) {
-      print('⚠️ [TokenOptimizer] History summarization request failed; falling back to last message: $e');
+      Log.e('⚠️ [TokenOptimizer] History summarization request failed; falling back to last message: $e');
       // Fallback mechanism: If the summarization API fails, at least retain the user's last input.
       return Message(
           role: 'assistant',
