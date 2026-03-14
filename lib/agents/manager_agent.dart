@@ -64,14 +64,14 @@ class ManagerAgent {
       try {
         // Request LLM to generate JS code
         final llmResponse = await llmClient.chat(conversation);
-        print('Raw Response: \n$llmResponse');
+        Log.i('Raw Response: \n$llmResponse');
 
         // Extract and clean the code
         final rawJsCode = _extractJSCode(llmResponse);
-        print('Extracted Code: \n[[$rawJsCode]]');
+        Log.i('Extracted Code: \n[[$rawJsCode]]');
 
         final cleanJsCode = _sanitizeJsCode(rawJsCode);
-        print('Final Execution Code: \n[[$cleanJsCode]]');
+        Log.i('Final Execution Code: \n[[$cleanJsCode]]');
 
         if (cleanJsCode.isEmpty) {
           return ExecutionResult.error(
@@ -79,7 +79,7 @@ class ManagerAgent {
           );
         }
 
-        print(
+        Log.i(
           '📦 Code generation complete. Pushing to Edge Sandbox for execution...',
         );
 
@@ -91,11 +91,11 @@ class ManagerAgent {
 
         // If execution is successful, return the result directly and break the loop
         if (result.isSuccess) {
-          print('✅ Code executed successfully!');
+          Log.i('✅ Code executed successfully!');
           return result;
         } else {
           // ⚠️ Execution failed. Capture error info and prepare for LLM Debugging
-          print('❌ Execution Error: ${result.stderr}');
+          Log.e('❌ Execution Error: ${result.stderr}');
 
           // Construct targeted error feedback
           String errorFeedback =

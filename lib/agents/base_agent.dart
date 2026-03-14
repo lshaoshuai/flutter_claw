@@ -2,6 +2,7 @@ import 'dart:async';
 import '../models/message.dart';
 import '../models/execution_result.dart';
 import '../llm/llm_client.dart';
+import '../utils/logger.dart';
 
 /// Enum representing the Agent's operational status
 enum AgentStatus {
@@ -65,7 +66,7 @@ abstract class BaseAgent {
     if (_status != newStatus) {
       _status = newStatus;
       _statusController.add(_status);
-      print('🤖 [$name] Status changed to: ${newStatus.name}');
+      Log.i('🤖 [$name] Status changed to: ${newStatus.name}');
     }
   }
 
@@ -88,7 +89,7 @@ abstract class BaseAgent {
   void clearMemory() {
     _memory.clear();
     updateStatus(AgentStatus.idle);
-    print('🧹 [$name] Memory cleared, reset to idle state.');
+    Log.i('🧹 [$name] Memory cleared, reset to idle state.');
   }
 
   /// Disposes of the Agent (releases Stream resources)
@@ -112,7 +113,7 @@ abstract class BaseAgent {
         updateStatus(AgentStatus.idle);
         return response;
       } catch (e) {
-        print('⚠️ [$name] LLM request failed (Attempt $attempts/$retries): $e');
+        Log.e('⚠️ [$name] LLM request failed (Attempt $attempts/$retries): $e');
         if (attempts >= retries) {
           updateStatus(AgentStatus.error);
           return null; // Terminal failure

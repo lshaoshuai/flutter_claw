@@ -78,9 +78,9 @@ class TaskConfig {
       maxRetries: maxRetries ?? this.maxRetries,
       requireNetwork: requireNetwork ?? this.requireNetwork,
       requireStorage: requireStorage ?? this.requireStorage,
-      requireBrowser: requireNetwork ?? this.requireBrowser,
-      requireTts: requireStorage ?? this.requireTts,
-      requireUi: requireNetwork ?? this.requireUi,
+      requireBrowser: requireNetwork ?? requireBrowser,
+      requireTts: requireStorage ?? requireTts,
+      requireUi: requireNetwork ?? requireUi,
     );
   }
 

@@ -1,6 +1,6 @@
 import 'dart:convert';
-import '../models/message.dart';
 import '../llm/llm_client.dart';
+import '../utils/logger.dart';
 
 /// Task Difficulty Enumeration
 enum TaskDifficulty {
@@ -91,7 +91,7 @@ class RouterAgent {
 
   /// Analyzes the user instruction and returns a routing decision.
   Future<RouteDecision> analyzeTask(String userInstruction) async {
-    print('🚦 RouterAgent is analyzing task complexity...');
+    Log.i('🚦 RouterAgent is analyzing task complexity...');
 
     final prompt = _buildRoutingPrompt(userInstruction);
 
@@ -101,10 +101,10 @@ class RouterAgent {
       final jsonMap = jsonDecode(responseText);
 
       final decision = RouteDecision.fromJson(jsonMap);
-      print('🧭 Routing decision complete: $decision');
+      Log.i('🧭 Routing decision complete: $decision');
       return decision;
     } catch (e) {
-      print(
+      Log.e(
         '⚠️ RouterAgent analysis failed; falling back to default moderate routing: $e',
       );
       // Fallback mechanism: If parsing fails, default to a moderate data analysis flow.

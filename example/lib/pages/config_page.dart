@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_claw/llm/openai_provider.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // 🌟 引入 shared_preferences
 
@@ -131,7 +130,7 @@ class _ConfigPageState extends State<ConfigPage> {
               // 模型选择下拉框
               DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: _selectedModel,
+                initialValue: _selectedModel,
                 decoration: InputDecoration(
                   labelText: 'Select AI Engine',
                   border: OutlineInputBorder(

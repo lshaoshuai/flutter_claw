@@ -38,6 +38,8 @@ dependencies:
   flutter_claw:
     path: ../
     
+  speech_to_text: any
+  shared_preferences: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

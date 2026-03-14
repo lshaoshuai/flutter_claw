@@ -49,6 +49,7 @@ dependencies:
   speech_to_text: ^7.3.0
   http: ^1.6.0
   flutter_dynamic_icon_plus: ^1.4.0
+  path: ^1.9.1
 
 
 dev_dependencies:

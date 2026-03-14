@@ -2,6 +2,7 @@ import 'dart:async';
 import '../models/message.dart';
 import '../models/execution_result.dart';
 import '../llm/llm_client.dart';
+import '../utils/logger.dart';
 import 'base_agent.dart';
 
 /// Concrete Execution Agent (Worker)
@@ -27,7 +28,7 @@ class WorkerAgent extends BaseAgent {
 
   @override
   Future<ExecutionResult> processTask(String instruction) async {
-    print('👷 [$name] Beginning task processing: $instruction');
+    Log.i('👷 [$name] Beginning task processing: $instruction');
 
     // 1. Record the user's new instruction into the Worker's short-term memory
     addMemory(Message(role: 'user', content: instruction));
@@ -44,7 +45,7 @@ class WorkerAgent extends BaseAgent {
     // 4. Add the successfully generated response back into memory to create a complete context closure
     addMemory(Message(role: 'assistant', content: response));
 
-    print('✅ [$name] Task processing completed.');
+    Log.i('✅ [$name] Task processing completed.');
 
     // 5. Wrap the result as a unified ExecutionResult and return it
     // Note: WorkerAgent is primarily responsible for generating text (e.g., copy, analysis reports, or code snippets).
