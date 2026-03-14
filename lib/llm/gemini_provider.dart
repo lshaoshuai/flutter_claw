@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/message.dart';
+import '../utils/logger.dart';
 import 'llm_client.dart';
 
 /// Concrete implementation of the Google Gemini model.
@@ -99,7 +100,7 @@ class GeminiProvider implements LLMClient {
         throw Exception('Gemini API Error [${response.statusCode}]: ${response.body}');
       }
     } catch (e) {
-      print('❌ [GeminiProvider] Model call failed: $e');
+      Log.e('❌ [GeminiProvider] Model call failed: $e');
       rethrow;
     }
   }

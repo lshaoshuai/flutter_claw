@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../utils/logger.dart';
+
 /// Virtual File System (VFS) Manager
 /// Responsible for providing a secure, isolated local working directory for the Agent.
 /// Strictly prevents Path Traversal attacks.
@@ -20,7 +22,7 @@ class VFSManager {
       await _workspaceDir.create(recursive: true);
     }
     _isInitialized = true;
-    print('📁 VFS Workspace initialization complete: ${_workspaceDir.path}');
+    Log.i('📁 VFS Workspace initialization complete: ${_workspaceDir.path}');
   }
 
   /// Core Security Moat: Resolves the relative path provided by the Agent into a secure absolute path.
@@ -103,6 +105,6 @@ class VFSManager {
       await _workspaceDir.delete(recursive: true);
       await _workspaceDir.create(recursive: true);
     }
-    print('🧹 VFS Workspace cleared; temporary files destroyed.');
+    Log.i('🧹 VFS Workspace cleared; temporary files destroyed.');
   }
 }

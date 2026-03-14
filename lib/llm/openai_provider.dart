@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/message.dart';
+import '../utils/logger.dart';
 import 'llm_client.dart';
 
 /// OpenAI 模型的具体实现
@@ -94,7 +95,7 @@ class OpenAIProvider implements LLMClient {
         throw Exception('OpenAI API 错误 [${response.statusCode}]: $responseBody');
       }
     } catch (e) {
-      print('❌ [OpenAIProvider] 调用模型失败: $e');
+      Log.e('❌ [OpenAIProvider] 调用模型失败: $e');
       rethrow;
     }
   }

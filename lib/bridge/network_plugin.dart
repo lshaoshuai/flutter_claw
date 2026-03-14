@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../utils/logger.dart';
 import 'bridge_registry.dart';
 
 /// Real Asynchronous Network Request Plugin
@@ -50,7 +51,7 @@ class NetworkPlugin extends ClawBridgePlugin {
     // Initialize cache status as 'pending'
     _responseCache[taskId] = '{"status": "pending"}';
 
-    print('🌐 [NetworkPlugin] Received async GET request: $url (TaskID: $taskId)');
+    Log.i('🌐 [NetworkPlugin] Received async GET request: $url (TaskID: $taskId)');
 
     // Trigger the actual async HTTP request (no await, allowing JS execution to continue)
     _executeRequest(taskId, url);
@@ -78,14 +79,14 @@ class NetworkPlugin extends ClawBridgePlugin {
           'message': 'HTTP Request failed with status: ${response.statusCode}',
         });
       }
-      print('✅ [NetworkPlugin] Async request completed (TaskID: $taskId)');
+      Log.i('✅ [NetworkPlugin] Async request completed (TaskID: $taskId)');
     } catch (e) {
       // Catch network exceptions (e.g., disconnected, DNS resolution failure)
       _responseCache[taskId] = jsonEncode({
         'status': 'error',
         'message': e.toString(),
       });
-      print('❌ [NetworkPlugin] Async request failed (TaskID: $taskId): $e');
+      Log.e('❌ [NetworkPlugin] Async request failed (TaskID: $taskId): $e');
     }
   }
 

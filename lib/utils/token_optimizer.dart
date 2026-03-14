@@ -1,5 +1,6 @@
 import '../models/message.dart';
 import '../llm/llm_client.dart';
+import 'logger.dart';
 
 /// Token Optimizer
 /// Responsible for pruning, compressing, and summarizing long conversation histories
@@ -33,7 +34,7 @@ class TokenOptimizer {
     while (currentChars > maxCharLimit && optimized.length > 1) {
       final removedMsg = optimized.removeAt(0);
       currentChars -= removedMsg.content.length;
-      print('✂️ [TokenOptimizer] Pruning excessive history (saved ${removedMsg.content.length} chars)');
+      Log.i('✂️ [TokenOptimizer] Pruning excessive history (saved ${removedMsg.content.length} chars)');
     }
 
     return optimized;
@@ -48,7 +49,7 @@ class TokenOptimizer {
       List<Message> longHistory,
       LLMClient fastClient
       ) async {
-    print('🧠 [TokenOptimizer] Triggering intelligent history compression...');
+    Log.i('🧠 [TokenOptimizer] Triggering intelligent history compression...');
 
     final historyText = longHistory.map((m) => '${m.role}: ${m.content}').join('\n---\n');
 
