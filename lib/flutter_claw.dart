@@ -6,6 +6,7 @@ export 'llm/gemini_provider.dart';
 export 'llm/openai_provider.dart';
 export 'skills/claw_skill.dart';
 export 'bridge/bridge_registry.dart';
+export 'context/claw_config.dart';
 
 import 'dart:async';
 import 'package:flutter_claw/perception/context_aggregator.dart';

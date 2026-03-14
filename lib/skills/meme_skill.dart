@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_claw/events/event_bus.dart'; // 请确保路径正确
+import '../context/claw_config.dart';
 import '../utils/logger.dart';
 import 'claw_skill.dart';
 
@@ -14,13 +15,13 @@ class MemeSkill extends ClawSkill {
   @override
   String get description =>
       '当你想用一张动图/表情包来幽默、生动地回应用户时调用。'
-          '请根据当前语境提取出一个精确的英文关键词去全网抓取最合适的表情包。发出图片后，你可以继续用文字配合。';
+      '请根据当前语境提取出一个精确的英文关键词去全网抓取最合适的表情包。发出图片后，你可以继续用文字配合。';
 
   // 🌟 修复 1：在签名里告诉大模型，直接调就行了，不需要 await
   @override
   String get jsSignature =>
       'Claw.skill_searchAndSendMeme(keyword: String) -> Returns JSON string // 发起后台搜图并发送，无需等待结果\n'
-          '// 示例: Claw.skill_searchAndSendMeme("laughing cat");';
+      '// 示例: Claw.skill_searchAndSendMeme("laughing cat");';
 
   @override
   Map<String, dynamic Function(List<dynamic>)> get methods => {
@@ -44,8 +45,19 @@ class MemeSkill extends ClawSkill {
   // 🌟 修复 3：把真正耗时的网络逻辑抽离成独立的异步方法
   Future<void> _fetchAndFireMeme(String keyword) async {
     // Giphy 免费公共测试 Key (准备商用时去申请自己的)
-    const apiKey = '';
-    final url = Uri.parse('https://api.giphy.com/v1/gifs/search?api_key=$apiKey&q=${Uri.encodeComponent(keyword)}&limit=1&rating=pg-13');
+    final apiKey = ClawConfig().getApiKey('GIPHY_API_KEY') ?? '';
+
+    // 防御性编程：如果没有配置，优雅地中断并提示
+    if (apiKey.isEmpty) {
+      Log.w('⚠️ [MemeSkill] 用户尚未配置 Giphy API Key，跳过搜图。');
+      // 可选：这里甚至可以触发一个特殊的 Event 给宿主 App，让宿主 App 弹窗提醒用户去设置页填 Key
+      // EventBus().fire(RequireConfigEvent('GIPHY_API_KEY', 'MemeSkill 需要您配置 Giphy Key 才能发表情包哦'));
+      return;
+    }
+
+    final url = Uri.parse(
+      'https://api.giphy.com/v1/gifs/search?api_key=$apiKey&q=${Uri.encodeComponent(keyword)}&limit=1&rating=pg-13',
+    );
 
     try {
       final response = await http.get(url);
