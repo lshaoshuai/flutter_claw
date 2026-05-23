@@ -45,9 +45,14 @@ dependencies:
   connectivity_plus: ^7.0.0
   shared_preferences: ^2.5.4
   geolocator: ^14.0.2
-  speech_to_text: ^7.3.0
+  # speech_to_text removed — its iOS pod (SwiftTryCatch 0.0.1) points to a
+  # deleted GitHub repo and breaks `pod install`. lib/ doesn't use it; only
+  # the example app does, which has its own pubspec.
+  # speech_to_text: ^7.3.0
   http: ^1.6.0
-  flutter_dynamic_icon_plus: ^1.4.0
+  # flutter_dynamic_icon_plus removed — its iOS podspec hard-depends on
+  # SwiftTryCatch which points to a deleted GitHub repo and breaks `pod install`.
+  # flutter_dynamic_icon_plus: ^1.4.0
   path: ^1.9.1
 
 
