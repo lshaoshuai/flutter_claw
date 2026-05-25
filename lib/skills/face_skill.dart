@@ -3,6 +3,11 @@ import 'package:flutter_claw/events/event_bus.dart';
 import 'claw_skill.dart';
 
 class FaceSkill extends ClawSkill {
+  FaceSkill({this.agentId});
+
+  /// 哪个 agent 的脸。null = 全局/默认。
+  final String? agentId;
+
   @override
   String get skillName => 'FaceControl';
 
@@ -37,8 +42,8 @@ class FaceSkill extends ClawSkill {
           tiltAngle: (config['tilt'] ?? 0.0).toDouble(),
           spacing: (config['spacing'] ?? 40).toDouble(),
           colorHex: config['color']?.toString() ?? '#00FFFF',
-          // 默认青色
           mouthSmile: (config['smile'] ?? 0.0).toDouble(),
+          agentId: agentId,
         ),
       );
       return '{"status": "success"}';

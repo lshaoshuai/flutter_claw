@@ -1,63 +1,102 @@
+import 'dart:async';
 import 'dart:io' show Platform;
+
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:supertonic_flutter/supertonic_flutter.dart';
+
 import 'bridge_registry.dart';
-import '../events/event_bus.dart'; // 🌟 引入事件总线
-import '../utils/logger.dart';     // 顺手把你之前的 print 换成标准日志
+import '../events/event_bus.dart';
+import '../utils/logger.dart';
 
-/// 文本转语音 (Text-to-Speech) 插件
-/// 赋予 Agent 说话的能力，支持自动识别语言，并联动 UI 表情系统
+/// 文本转语音 (Text-to-Speech) 插件。
+///
+/// 双引擎策略：
+/// - `supertonic_flutter`：神经 TTS，模型本地化后完全离线。
+///   覆盖 EN / KO / ES / PT / FR。
+/// - `flutter_tts`：系统级 TTS，作为 zh-CN / ja-JP 等
+///   supertonic 不支持语种的兜底。
+///
+/// supertonic 首次使用会从 HuggingFace 下载 ~268MB 模型，
+/// 因此采用懒加载：第一次需要它时才触发 `initialize()`，
+/// 不阻塞插件构造。
+///
+/// 每个 [TTSPlugin] 实例可以挂在不同的 [BridgeRegistry] 下，给不同的
+/// agent 各自一张嘴；通过 [agentId] 把 SpeakingStatusEvent 路由回 UI。
 class TTSPlugin extends ClawBridgePlugin {
-  final FlutterTts flutterTts = FlutterTts();
-
-  TTSPlugin() {
-    _initTts();
+  TTSPlugin({
+    this.agentId,
+    String defaultVoiceStyle = 'F1',
+    double speechSpeed = 1.05,
+  })  : _defaultVoiceStyle = defaultVoiceStyle,
+        _ttsConfig = TTSConfig(speechSpeed: speechSpeed) {
+    _initFallbackTts();
   }
 
-  Future<void> _initTts() async {
-    // 基础设置 (语速、音调)
-    await flutterTts.setSpeechRate(0.5);
-    await flutterTts.setPitch(1.2);
+  /// 哪个 agent 在说话。null = 全局/默认。
+  final String? agentId;
 
-    // 🌟 1. 绑定发声生命周期到事件总线 (联动 ClawAvatar)
-    flutterTts.setStartHandler(() {
-      Log.i('🗣️ [TTSPlugin] 开始播报');
-      EventBus().fire(SpeakingStatusEvent(true)); // 通知脸部：开始动嘴巴/眼睛闪烁
+  // ---- supertonic (主引擎) ----
+  final String _defaultVoiceStyle;
+  final TTSConfig _ttsConfig;
+  final SupertonicTTS _supertonic = SupertonicTTS();
+  final TTSAudioPlayer _player = TTSAudioPlayer();
+  Future<bool>? _supertonicReady;
+
+  // ---- flutter_tts (zh / ja 兜底) ----
+  final FlutterTts _fallbackTts = FlutterTts();
+
+  Future<void> _initFallbackTts() async {
+    await _fallbackTts.setSpeechRate(0.5);
+    await _fallbackTts.setPitch(1.2);
+
+    _fallbackTts.setStartHandler(() {
+      Log.i('🗣️ [TTSPlugin/sys] 开始播报');
+      EventBus().fire(SpeakingStatusEvent(true, agentId: agentId));
+    });
+    _fallbackTts.setCompletionHandler(() {
+      Log.i('🤐 [TTSPlugin/sys] 播报结束');
+      EventBus().fire(SpeakingStatusEvent(false, agentId: agentId));
+    });
+    _fallbackTts.setCancelHandler(() {
+      Log.w('🛑 [TTSPlugin/sys] 播报被取消');
+      EventBus().fire(SpeakingStatusEvent(false, agentId: agentId));
+    });
+    _fallbackTts.setErrorHandler((msg) {
+      Log.e('❌ [TTSPlugin/sys] 播报出错: $msg');
+      EventBus().fire(SpeakingStatusEvent(false, agentId: agentId));
     });
 
-    flutterTts.setCompletionHandler(() {
-      Log.i('🤐 [TTSPlugin] 播报结束');
-      EventBus().fire(SpeakingStatusEvent(false)); // 通知脸部：恢复平静
-    });
-
-    flutterTts.setCancelHandler(() {
-      Log.w('🛑 [TTSPlugin] 播报被取消');
-      EventBus().fire(SpeakingStatusEvent(false));
-    });
-
-    flutterTts.setErrorHandler((msg) {
-      Log.e('❌ [TTSPlugin] 播报出错: $msg');
-      EventBus().fire(SpeakingStatusEvent(false));
-    });
-
-    // 🌟 2. 平台专属配置初始化
     try {
       if (Platform.isAndroid) {
-        // 仅 Android 支持 QueueMode
-        await flutterTts.setQueueMode(1);
+        await _fallbackTts.setQueueMode(1);
       } else if (Platform.isIOS) {
-        // 仅 iOS 支持 AudioCategory
-        await flutterTts.setIosAudioCategory(
+        await _fallbackTts.setIosAudioCategory(
           IosTextToSpeechAudioCategory.playback,
           [
             IosTextToSpeechAudioCategoryOptions.allowBluetooth,
             IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
-            IosTextToSpeechAudioCategoryOptions.mixWithOthers
+            IosTextToSpeechAudioCategoryOptions.mixWithOthers,
           ],
         );
       }
     } catch (e) {
-      Log.e('⚠️ [TTSPlugin] 平台专属配置初始化失败: $e');
+      Log.e('⚠️ [TTSPlugin/sys] 平台专属配置初始化失败: $e');
     }
+  }
+
+  /// 懒加载 supertonic 引擎。首次调用会触发模型缓存检查 / 下载。
+  Future<bool> _ensureSupertonicReady() {
+    return _supertonicReady ??= () async {
+      try {
+        Log.i('🧠 [TTSPlugin] 正在初始化 supertonic 神经 TTS…');
+        await _supertonic.initialize();
+        Log.i('✅ [TTSPlugin] supertonic 就绪');
+        return true;
+      } catch (e) {
+        Log.e('❌ [TTSPlugin] supertonic 初始化失败: $e');
+        return false;
+      }
+    }();
   }
 
   @override
@@ -65,22 +104,17 @@ class TTSPlugin extends ClawBridgePlugin {
 
   @override
   Map<String, dynamic Function(List<dynamic>)> get methods => {
-    'speak': _speak,
-  };
+        'speak': _speak,
+      };
 
-  // ============================================================================
-  // 🌟 核心优化：向 LLM 声明 API 签名，并强调其多语言和口语化特性
-  // ============================================================================
   @override
   List<String> get jsSignatures => [
-    'Claw.tts_speak(text: String) -> Returns JSON string {"status": "success"} // 调用扬声器用语音读出文本内容。自带中、日、英语言自动识别。请确保传入的文本尽量口语化，避免包含复杂的 Markdown 代码或生僻符号。'
-  ];
+        'Claw.tts_speak(text: String) -> Returns JSON string {"status": "success"} // 调用扬声器用语音读出文本内容。自带中、日、英、韩、西、葡、法语言自动识别（中日走系统 TTS，其余走离线神经 TTS）。请确保传入的文本尽量口语化，避免包含复杂的 Markdown 代码或生僻符号。'
+      ];
 
-  /// JS 端同步调用: Claw.tts_speak('你好 / Hello')
   dynamic _speak(List<dynamic> args) {
     if (args.isEmpty) return '{"error": "Missing text parameter"}';
 
-    // 过滤破坏性符号 (换行、Markdown 标记)
     final rawText = args[0].toString();
     final safeText = rawText
         .replaceAll('\n', ' ')
@@ -88,34 +122,63 @@ class TTSPlugin extends ClawBridgePlugin {
         .replaceAll('*', '')
         .replaceAll('#', '');
 
-    // 异步触发语音播报与语言切换 (不阻塞 JS 执行线程)
     _speakWithLanguageDetection(safeText);
-
     return '{"status": "success"}';
   }
 
-  /// 内部异步方法：检测语言并播报
   Future<void> _speakWithLanguageDetection(String text) async {
-    // 正则匹配：是否包含中文字符 (CJK 统一表意文字)
-    final hasChinese = RegExp(r'[\u4e00-\u9fa5]').hasMatch(text);
-    // 正则匹配：是否包含日文假名
+    final hasChinese = RegExp(r'[一-龥]').hasMatch(text);
     final hasJapanese = RegExp(r'[ぁ-んァ-ン]').hasMatch(text);
+    final hasKorean = RegExp(r'[가-힯]').hasMatch(text);
 
+    if (hasChinese) {
+      await _speakWithFallback(text, 'zh-CN');
+      return;
+    }
+    if (hasJapanese) {
+      await _speakWithFallback(text, 'ja-JP');
+      return;
+    }
+
+    final language = hasKorean ? 'ko' : 'en';
+    await _speakWithSupertonic(text, language: language);
+  }
+
+  Future<void> _speakWithSupertonic(
+    String text, {
+    required String language,
+  }) async {
+    final ready = await _ensureSupertonicReady();
+    if (!ready) {
+      await _speakWithFallback(text, 'en-US');
+      return;
+    }
+
+    EventBus().fire(SpeakingStatusEvent(true, agentId: agentId));
     try {
-      if (hasChinese) {
-        await flutterTts.setLanguage("zh-CN");
-      } else if (hasJapanese) {
-        await flutterTts.setLanguage("ja-JP");
-      } else {
-        // 如果都没有，默认回退到英文
-        await flutterTts.setLanguage("en-US");
-      }
-
-      // 切换完语言后，开始播报。由于我们在 init 里设置了 Handler，
-      // 这里调用 speak 后，EventBus 会自动捕获并通知 UI！
-      await flutterTts.speak(text);
+      Log.i('🗣️ [TTSPlugin/supertonic] $language/$_defaultVoiceStyle 开始合成');
+      final result = await _supertonic.synthesize(
+        text,
+        language: language,
+        voiceStyle: _defaultVoiceStyle,
+        config: _ttsConfig,
+      );
+      await _player.play(result);
+      Log.i('🤐 [TTSPlugin/supertonic] 播报结束');
     } catch (e) {
-      Log.e('❌ [TTSPlugin] 语言切换或播报失败: $e');
+      Log.e('❌ [TTSPlugin/supertonic] 合成或播放失败: $e');
+    } finally {
+      EventBus().fire(SpeakingStatusEvent(false, agentId: agentId));
+    }
+  }
+
+  Future<void> _speakWithFallback(String text, String locale) async {
+    try {
+      await _fallbackTts.setLanguage(locale);
+      await _fallbackTts.speak(text);
+    } catch (e) {
+      Log.e('❌ [TTSPlugin/sys] 语言切换或播报失败: $e');
+      EventBus().fire(SpeakingStatusEvent(false, agentId: agentId));
     }
   }
 }

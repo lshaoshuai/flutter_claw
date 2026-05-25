@@ -6,7 +6,13 @@ import '../utils/logger.dart';
 // ============================================================================
 abstract class ClawEvent {
   final DateTime timestamp;
-  ClawEvent() : timestamp = DateTime.now();
+
+  /// 哪个 agent 发出的事件。null 表示全局/默认 agent。
+  /// 当 weclaw 这类多 agent runtime 共享 EventBus 时，UI 用这个字段
+  /// 路由到对应 agent 的头像/状态条。
+  final String? agentId;
+
+  ClawEvent({this.agentId}) : timestamp = DateTime.now();
 }
 
 // ============================================================================
@@ -18,25 +24,25 @@ class SystemStatusEvent extends ClawEvent {
   final String triggerType; // 例如: "battery_low", "app_resumed"
   final dynamic payload;    // 携带的数据，例如电量百分比 15
 
-  SystemStatusEvent(this.triggerType, {this.payload});
+  SystemStatusEvent(this.triggerType, {this.payload, super.agentId});
 }
 
 /// 记忆更新事件 (当 Agent 记住了新东西时触发，可用于刷新 UI)
 class MemoryUpdatedEvent extends ClawEvent {
   final String newFact;
-  MemoryUpdatedEvent(this.newFact);
+  MemoryUpdatedEvent(this.newFact, {super.agentId});
 }
 
 /// 主动对话请求事件 (潜意识引擎决定开口说话时触发)
 class ProactiveSpeakEvent extends ClawEvent {
-  final String thoughtContext; // 告诉 Agent 为什么开口，例如："用户刚起床，说句早安"
-  ProactiveSpeakEvent(this.thoughtContext);
+  final String thoughtContext;
+  ProactiveSpeakEvent(this.thoughtContext, {super.agentId});
 }
 
 /// 当主人说话时，传递麦克风捕获的音量级别
-class ListeningLevelEvent extends ClawEvent{
+class ListeningLevelEvent extends ClawEvent {
   final double level;
-  ListeningLevelEvent(this.level);
+  ListeningLevelEvent(this.level, {super.agentId});
 }
 
 /// 情绪表现事件 (控制眼睛是开心、生气还是悲伤)
@@ -48,7 +54,6 @@ class FaceExpressionEvent extends ClawEvent {
   final double spacing;
   final double tiltAngle;
   final String colorHex;
-  // 🌟 新增嘴巴参数
   final double mouthSmile; // 嘴巴弧度: 1.0(大笑), 0.0(平直), -1.0(悲伤下拉)
 
   FaceExpressionEvent({
@@ -59,21 +64,20 @@ class FaceExpressionEvent extends ClawEvent {
     required this.tiltAngle,
     required this.colorHex,
     required this.mouthSmile,
+    super.agentId,
   });
 }
 
-// 保留之前的 SpeakingStatusEvent，用于叠加嘴巴/说话动画
 class SpeakingStatusEvent extends ClawEvent {
   final bool isSpeaking;
-  SpeakingStatusEvent(this.isSpeaking);
+  SpeakingStatusEvent(this.isSpeaking, {super.agentId});
 }
 
-/// 当 Agent 决定发送表情包时触发
 class SendMemeEvent extends ClawEvent {
   final String memeUrl;
   final String emotion;
 
-  SendMemeEvent({required this.memeUrl, required this.emotion});
+  SendMemeEvent({required this.memeUrl, required this.emotion, super.agentId});
 }
 
 // ============================================================================

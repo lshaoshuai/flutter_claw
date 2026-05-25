@@ -39,7 +39,11 @@ dependencies:
   flutter_js: ^0.8.7
   path_provider: ^2.1.5
   logger: ^2.6.2
+  # 中文 / 日文兜底（supertonic 不支持 zh/ja）
   flutter_tts: ^4.2.5
+  # 离线神经 TTS：模型下载到本地后完全离线运行。
+  # 支持 EN / KO / ES / PT / FR；iOS 16+/Android API 21+/macOS 14+。
+  supertonic_flutter: ^1.0.0
   json_annotation: ^4.11.0
   battery_plus: ^7.0.0
   connectivity_plus: ^7.0.0

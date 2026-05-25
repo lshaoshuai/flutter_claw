@@ -6,6 +6,11 @@ import '../utils/logger.dart';
 import 'claw_skill.dart';
 
 class MemeSkill extends ClawSkill {
+  MemeSkill({this.agentId});
+
+  /// 哪个 agent 发的表情包。null = 全局/默认。
+  final String? agentId;
+
   @override
   String get skillName => 'MemeSender';
 
@@ -71,7 +76,8 @@ class MemeSkill extends ClawSkill {
           final gifUrl = results[0]['images']['fixed_height']['url'];
 
           // 🔥 突破沙盒，直接打入 Flutter UI 渲染总线
-          EventBus().fire(SendMemeEvent(memeUrl: gifUrl, emotion: keyword));
+          EventBus().fire(
+              SendMemeEvent(memeUrl: gifUrl, emotion: keyword, agentId: agentId));
           Log.i('✅ [MemeSkill] 已成功搜索并发送表情包: $gifUrl');
         } else {
           Log.w('⚠️ [MemeSkill] 未搜到关于 [$keyword] 的动图');
