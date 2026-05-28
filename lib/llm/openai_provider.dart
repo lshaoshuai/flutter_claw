@@ -99,4 +99,132 @@ class OpenAIProvider implements LLMClient {
       rethrow;
     }
   }
+
+  // ───────────────── Native tool calling (OpenAI /v1/chat tools) ─────────────────
+
+  @override
+  Future<ChatTurnResult> chatWithTools(
+    List<Message> messages,
+    List<Map<String, dynamic>> tools, {
+    Duration? timeout,
+  }) async {
+    final url = Uri.parse('$baseUrl/chat/completions');
+    final formatted = messages.map((m) => m.toJson()).toList();
+    final payload = <String, dynamic>{
+      'model': model,
+      'messages': formatted,
+      'temperature': 0.2,
+      if (tools.isNotEmpty) 'tools': tools,
+      if (tools.isNotEmpty) 'tool_choice': 'auto',
+    };
+
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $apiKey',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(timeout ?? defaultTimeout);
+
+      final body = utf8.decode(response.bodyBytes);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+            'OpenAI tool-calls API error [${response.statusCode}]: $body');
+      }
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      final choices = data['choices'] as List<dynamic>?;
+      if (choices == null || choices.isEmpty) {
+        throw Exception('OpenAI tool-calls: empty choices');
+      }
+      final message = choices.first['message'] as Map<String, dynamic>?;
+      if (message == null) {
+        throw Exception('OpenAI tool-calls: missing message');
+      }
+      final content = (message['content'] as String?) ?? '';
+      final rawCalls = message['tool_calls'] as List<dynamic>?;
+      final calls = rawCalls == null
+          ? const <ToolCall>[]
+          : rawCalls
+              .whereType<Map>()
+              .map((m) => ToolCall.fromJson(m.cast<String, dynamic>()))
+              .toList();
+      return ChatTurnResult(content: content, toolCalls: calls);
+    } catch (e) {
+      Log.e('❌ [OpenAIProvider/tools] $e');
+      rethrow;
+    }
+  }
+
+  // ─────────────────── Streaming (Server-Sent Events) ───────────────────
+
+  @override
+  Stream<String> streamChat(List<Message> messages,
+      {Duration? timeout}) async* {
+    final url = Uri.parse('$baseUrl/chat/completions');
+    final formatted = messages
+        .map((m) => {'role': m.role, 'content': m.content})
+        .toList();
+    final payload = <String, dynamic>{
+      'model': model,
+      'messages': formatted,
+      'temperature': 0.2,
+      'stream': true,
+    };
+
+    final req = http.Request('POST', url)
+      ..headers.addAll({
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': 'Bearer $apiKey',
+        'Accept': 'text/event-stream',
+      })
+      ..body = jsonEncode(payload);
+
+    final client = http.Client();
+    try {
+      final response =
+          await client.send(req).timeout(timeout ?? defaultTimeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final body = await response.stream.bytesToString();
+        throw Exception('OpenAI stream 错误 [${response.statusCode}]: $body');
+      }
+
+      // Decode bytes → UTF-8 lines.  Note SSE may pack multiple events into
+      // one HTTP chunk; split by newline manually so we don't lose any.
+      String pending = '';
+      await for (final chunk in response.stream.transform(utf8.decoder)) {
+        pending += chunk;
+        while (true) {
+          final nl = pending.indexOf('\n');
+          if (nl < 0) break;
+          final line = pending.substring(0, nl).trim();
+          pending = pending.substring(nl + 1);
+          if (line.isEmpty || !line.startsWith('data:')) continue;
+          final data = line.substring(5).trim();
+          if (data == '[DONE]') return;
+          try {
+            final json = jsonDecode(data);
+            final choices = json is Map ? json['choices'] as List? : null;
+            if (choices != null && choices.isNotEmpty) {
+              final delta = (choices.first as Map)['delta'] as Map?;
+              final content = delta?['content'] as String?;
+              if (content != null && content.isNotEmpty) {
+                yield content;
+              }
+            }
+          } catch (_) {
+            // Ignore malformed lines — SSE keep-alive comments etc.
+          }
+        }
+      }
+    } catch (e) {
+      Log.e('❌ [OpenAIProvider/stream] 失败: $e');
+      rethrow;
+    } finally {
+      client.close();
+    }
+  }
 }

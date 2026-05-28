@@ -1,10 +1,13 @@
 // 统一导出所有模型和客户端，UI 层只需要 import 这一文件即可
 export 'models/message.dart';
 export 'models/execution_result.dart';
+export 'models/emotion_params.dart';
 export 'llm/llm_client.dart';
 export 'llm/gemini_provider.dart';
 export 'llm/openai_provider.dart';
 export 'skills/claw_skill.dart';
+export 'skills/skill_manager.dart' show SkillManager, NativeToolFormat;
+export 'skills/tool_call_runner.dart';
 export 'bridge/bridge_registry.dart';
 export 'context/claw_config.dart';
 

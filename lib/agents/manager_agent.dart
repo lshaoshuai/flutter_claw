@@ -4,7 +4,9 @@ import '../models/message.dart';
 import '../models/task_config.dart';
 import '../sandbox/js_runtime.dart';
 import '../llm/llm_client.dart';
+import '../utils/js_statement_splitter.dart';
 import '../utils/logger.dart';
+import '../utils/markdown_code_extractor.dart';
 
 /// Core Orchestration Brain: Responsible for intent understanding, code generation,
 /// sandbox execution, and error-handling retries.
@@ -125,6 +127,108 @@ class ManagerAgent {
     return ExecutionResult.error(
       'Task failed. Maximum retries reached ($maxRetries). Check logs for the final error.',
     );
+  }
+
+  /// Streaming version of [process]: pipes LLM deltas through a markdown
+  /// extractor + JS statement splitter, dispatching each complete statement
+  /// to the sandbox the moment it's parseable.  This is what enables
+  /// "Hiyori reacts before she finishes typing" — the first
+  /// `Claw.skill_setEmotion(...)` line fires within ~200ms of the user
+  /// pressing send, instead of waiting for the entire response to arrive.
+  ///
+  /// Returns the final [ExecutionResult] (text captured by `Claw.finish()`).
+  /// On any sandbox / network failure mid-stream we still try to return
+  /// what we've accumulated so far rather than throwing.
+  Future<ExecutionResult> streamProcess(
+    String instruction, {
+    TaskConfig? config,
+  }) async {
+    final taskConfig = config ?? defaultConfig;
+    Log.i(
+        '🧠 ManagerAgent[STREAM] task [${taskConfig.taskId}]: $instruction');
+
+    if (!jsRuntime.isInitialized) {
+      try {
+        await jsRuntime.initialize();
+      } catch (e) {
+        return ExecutionResult.error('Sandbox init failed: $e');
+      }
+    }
+
+    final conversation = <Message>[
+      Message(role: 'system', content: buildSystemPrompt()),
+      Message(role: 'user', content: instruction),
+    ];
+
+    final mdExtractor = MarkdownCodeExtractor();
+    final splitter = JSStatementSplitter();
+
+    // Capture every Claw.finish() the sandbox emits during this turn.
+    ExecutionResult? finalResult;
+    final finishSub = jsRuntime.onFinish.listen((r) {
+      finalResult = r;
+    });
+
+    // For retry / error feedback, we'd need to buffer the whole response.
+    // In streaming mode we sacrifice the retry loop in exchange for
+    // responsiveness — if a statement fails its error goes to logs and we
+    // continue dispatching the rest.
+    final raw = StringBuffer();
+    int stmtCount = 0;
+
+    void dispatch(String stmt) {
+      final clean = _sanitizeJsCode(stmt);
+      if (clean.isEmpty) return;
+      stmtCount++;
+      final preview = clean.length > 80 ? '${clean.substring(0, 80)}…' : clean;
+      Log.i('▶️ [stream #$stmtCount] $preview');
+      final r = jsRuntime.evalRaw(clean);
+      if (!r.isSuccess) {
+        Log.e('   stmt failed: ${r.stderr}');
+      }
+    }
+
+    try {
+      final stream = llmClient.streamChat(conversation,
+          timeout: taskConfig.timeout);
+
+      await for (final delta in stream) {
+        raw.write(delta);
+        final code = mdExtractor.feed(delta);
+        if (code.isEmpty) continue;
+        for (final stmt in splitter.feed(code)) {
+          dispatch(stmt);
+        }
+      }
+
+      // EOF: drain remaining splitter buffer (e.g. last statement missing `;`)
+      final pending = splitter.drain();
+      if (pending.isNotEmpty) dispatch(pending);
+
+      // Fallback: LLM never used a code fence — run the whole raw thing.
+      final fallback = mdExtractor.drainFallback();
+      if (fallback.isNotEmpty) {
+        for (final stmt in splitter.feed(fallback)) {
+          dispatch(stmt);
+        }
+        final tail = splitter.drain();
+        if (tail.isNotEmpty) dispatch(tail);
+      }
+    } catch (e, st) {
+      Log.e('❌ stream consumption failed: $e', stackTrace: st);
+      // Fall through to whatever finalResult / accumulated text we have.
+    } finally {
+      // Give Claw.finish a brief moment to land — bridge callback is async.
+      await Future.delayed(const Duration(milliseconds: 80));
+      await finishSub.cancel();
+    }
+
+    if (finalResult != null) {
+      Log.i('✅ stream done; $stmtCount stmts dispatched, finish captured');
+      return finalResult!;
+    }
+    Log.w('⚠️ stream ended without Claw.finish; returning raw text');
+    return ExecutionResult.success(raw.toString().trim());
   }
 
   /// Constructs a strictly enforced Sandbox System Prompt

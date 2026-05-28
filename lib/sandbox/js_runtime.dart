@@ -15,6 +15,13 @@ class ClawJSRuntime {
   /// call `Claw.finish()` to retrieve the final result.
   Completer<ExecutionResult>? _executionCompleter;
 
+  /// Broadcasts every `Claw.finish(...)` event so streaming callers
+  /// (e.g. ManagerAgent.streamProcess) can listen independently of the
+  /// legacy [evaluate] / completer flow.
+  final StreamController<ExecutionResult> _finishController =
+      StreamController<ExecutionResult>.broadcast();
+  Stream<ExecutionResult> get onFinish => _finishController.stream;
+
   bool get isInitialized => _runtime != null;
 
   /// Initializes the sandbox environment
@@ -29,21 +36,25 @@ class ClawJSRuntime {
     // When the LLM finishes running code and obtains the business result,
     // it MUST call this method to notify the Dart layer.
     _runtime!.onMessage('Claw_finish', (dynamic args) {
+      // Parse the returned result (args is typically data sent from JS)
+      String finalOutput = '';
+      if (args is List && args.isNotEmpty) {
+        finalOutput = args.first.toString();
+      } else {
+        finalOutput = args.toString();
+      }
+      final result = ExecutionResult(
+        isSuccess: true,
+        stdout: finalOutput,
+        stderr: '',
+      );
+      // Legacy path: complete the awaiting evaluate() call.
       if (_executionCompleter != null && !_executionCompleter!.isCompleted) {
-        // Parse the returned result (args is typically data sent from JS)
-        String finalOutput = '';
-        if (args is List && args.isNotEmpty) {
-          finalOutput = args.first.toString();
-        } else {
-          finalOutput = args.toString();
-        }
-
-        // Successfully captured the result; complete the Dart-layer await.
-        _executionCompleter!.complete(ExecutionResult(
-          isSuccess: true,
-          stdout: finalOutput,
-          stderr: '',
-        ));
+        _executionCompleter!.complete(result);
+      }
+      // New path: broadcast for streaming callers.
+      if (!_finishController.isClosed) {
+        _finishController.add(result);
       }
     });
 
@@ -140,10 +151,30 @@ class ClawJSRuntime {
     }
   }
 
+  /// Fire-and-forget single-statement evaluation.  Used by the streaming
+  /// path where statements are dispatched as soon as they're parsed,
+  /// without setting up a completer for each.  Any [Claw.finish] called
+  /// from the code still arrives via [onFinish].
+  ExecutionResult evalRaw(String jsCode) {
+    if (_runtime == null) {
+      return ExecutionResult.error('Sandbox not initialized.');
+    }
+    try {
+      final r = _runtime!.evaluate(jsCode);
+      if (r.isError) {
+        return ExecutionResult.error('JS Error: ${r.stringResult}');
+      }
+      return ExecutionResult.success(r.stringResult.toString());
+    } catch (e) {
+      return ExecutionResult.error('evalRaw exception: $e');
+    }
+  }
+
   /// Releases JS engine memory at the C/C++ layer.
   /// Extremely Important! This must be called when the App exits or the
   /// environment resets; otherwise, it will lead to severe memory leaks.
   void dispose() {
+    _finishController.close();
     _runtime?.dispose();
     _runtime = null;
     Log.i('🧹 Claw Edge Sandbox memory released.');

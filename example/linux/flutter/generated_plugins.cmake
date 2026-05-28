@@ -3,7 +3,10 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  audioplayers_linux
   flutter_js
+  flutter_onnxruntime
+  supertonic_flutter
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

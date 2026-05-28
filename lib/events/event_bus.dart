@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../models/emotion_params.dart';
 import '../utils/logger.dart';
 
 // ============================================================================
@@ -73,11 +74,68 @@ class SpeakingStatusEvent extends ClawEvent {
   SpeakingStatusEvent(this.isSpeaking, {super.agentId});
 }
 
+/// 🌟 嘴型同步用：随 TTS 音频实时推送声波振幅 (0..1)。
+///
+/// 渲染层（Live2D / 矢量 avatar）拿这个值作为 mouthOpen 的瞬时驱动，从而
+/// 让嘴型跟说话节奏对齐。约每 33ms 一帧 (~30fps)。
+///
+/// supertonic 路径会预解析 WAV 的 RMS 包络精确驱动；flutter_tts 系统 TTS
+/// 拿不到 PCM，则退化为 ~4Hz 正弦波，节奏对不齐但嘴在动。
+class LipSyncAmplitudeEvent extends ClawEvent {
+  /// 0 = 完全闭嘴, 1 = 全开。
+  final double amplitude;
+  LipSyncAmplitudeEvent(this.amplitude, {super.agentId});
+}
+
+/// 🌟 富参数情绪事件 — 推荐用法。
+///
+/// 比 [FaceExpressionEvent] 表达力更强：渲染层拿到完整 [EmotionParams] 后
+/// 可以平滑插值、做颤抖、做色相偏移等动画。AI 通过 `Claw.skill_setEmotion`
+/// 触发；旧的 setFace 路径仍走 [FaceExpressionEvent] 以保兼容。
+class EmotionStateEvent extends ClawEvent {
+  final EmotionParams params;
+
+  /// AI 当时给的语义标签 (e.g. "angry")，UI 可拿来显示文字提示；可空。
+  final String? semanticLabel;
+
+  EmotionStateEvent(this.params, {this.semanticLabel, super.agentId});
+}
+
 class SendMemeEvent extends ClawEvent {
   final String memeUrl;
   final String emotion;
 
   SendMemeEvent({required this.memeUrl, required this.emotion, super.agentId});
+}
+
+/// 🚨 Agent 越权霸屏事件 — AI 通过 [AlertSkill.alertUser] 主动打破常规
+/// 对话流程，强制弹出一块"高于其他 UI 的"反馈卡片。宿主 App 监听并渲染。
+///
+/// [level] 决定视觉强度：
+///  * "info"    — 底部 snackbar / 顶部小条
+///  * "warning" — 顶部黄色横幅 + 中等震动
+///  * "urgent"  — 屏幕闪红 + 全屏 modal + 重震动
+///
+/// [haptic] / [flash] 是 UI 层渲染时的参考开关；具体效果由宿主决定。
+class AlertEvent extends ClawEvent {
+  final String level;          // "info" | "warning" | "urgent"
+  final String title;
+  final String? message;
+  final String? color;         // hex like "#FF3333", optional
+  final int durationMs;        // 0 = require manual dismiss
+  final bool flash;
+  final String haptic;         // "none" | "light" | "medium" | "heavy"
+
+  AlertEvent({
+    required this.title,
+    this.message,
+    this.level = 'info',
+    this.color,
+    this.durationMs = 4000,
+    this.flash = false,
+    this.haptic = 'medium',
+    super.agentId,
+  });
 }
 
 // ============================================================================

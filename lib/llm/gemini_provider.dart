@@ -104,4 +104,32 @@ class GeminiProvider implements LLMClient {
       rethrow;
     }
   }
+
+  /// Gemini doesn't ship a clean SSE delta stream out of the box (its
+  /// "streamGenerateContent" returns a JSON array stream).  For now we
+  /// fall back to non-streaming — yields the full response as a single
+  /// chunk so the streaming caller keeps working with no observable change.
+  /// TODO: implement real Gemini SSE if/when needed.
+  @override
+  Stream<String> streamChat(List<Message> messages, {Duration? timeout}) async* {
+    yield await chat(messages, timeout: timeout);
+  }
+
+  /// Gemini's native function-calling lives at a different endpoint
+  /// (`generateContent` with `tools: [{functionDeclarations: [...]}]`) and
+  /// returns `functionCall` parts instead of OpenAI-style `tool_calls`.
+  /// Wiring that adapter is doable but out of scope for the initial native
+  /// tool-calls rollout — we deliberately throw so [AgentRuntime] catches
+  /// the error and falls back to the JS-sandbox path on this provider.
+  @override
+  Future<ChatTurnResult> chatWithTools(
+    List<Message> messages,
+    List<Map<String, dynamic>> tools, {
+    Duration? timeout,
+  }) {
+    throw UnsupportedError(
+      'GeminiProvider does not yet implement native tool calling — '
+      'runtime will fall back to the JS-sandbox path automatically.',
+    );
+  }
 }
